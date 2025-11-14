@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================================================
+     POM.XML - Maven Project Configuration File
+     NODE.JS EQUIVALENT: package.json
+     ============================================================================
+     This file defines:
+     - Project metadata (name, version, description)
+     - Dependencies (like npm packages in package.json)
+     - Build configuration (like npm scripts)
+     ============================================================================ -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ========================================================================
+         PARENT PROJECT - Inherits Spring Boot Configuration
+         NODE.JS EQUIVALENT: Like specifying Node.js version in package.json
+         "engines": { "node": ">=17.0.0" }
+         ========================================================================
+         This inherits default Spring Boot configurations, versions, etc.
+         You don't need to specify versions for most Spring Boot dependencies -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+
+    <!-- ========================================================================
+         PROJECT METADATA
+         NODE.JS EQUIVALENT (package.json):
+         {
+           "name": "course-management-service",
+           "version": "1.0.0",
+           "description": "Spring Boot microservice..."
+         }
+         ======================================================================== -->
+    <groupId>com.example</groupId>
+    <artifactId>course-management-service</artifactId>
+    <version>1.0.0</version>
+    <name>Course Management Service</name>
+    <description>Spring Boot microservice for Course Management with Discussions and Posts</description>
+
+    <!-- ========================================================================
+         PROPERTIES - Project Configuration
+         NODE.JS EQUIVALENT: "engines": { "node": ">=17.0.0" }
+         ========================================================================
+         java.version: Specifies Java version (like Node.js version requirement)
+         compiler.source/target: Tells compiler to use Java 17 -->
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <!-- ========================================================================
+         DEPENDENCIES - External Libraries (Like npm packages in package.json)
+         NODE.JS EQUIVALENT: "dependencies" in package.json
+         ========================================================================
+         These are libraries your project needs to run.
+         Maven downloads them from Maven Central (like npm downloads from npm registry)
+         ======================================================================== -->
+    <dependencies>
+        <!-- Spring Boot Web Starter
+             NODE.JS EQUIVALENT: "express": "^4.18.0"
+             Provides: Web server (Tomcat), REST API support, JSON parsing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Data MongoDB
+             NODE.JS EQUIVALENT: "mongoose": "^7.0.0"
+             Provides: MongoDB connection, database operations, repository support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Validation
+             NODE.JS EQUIVALENT: "express-validator": "^7.0.0" or "joi": "^17.9.0"
+             Provides: Input validation (@NotBlank, @Size, etc.) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Spring Boot DevTools
+             NODE.JS EQUIVALENT: "nodemon": "^3.0.0" (in devDependencies)
+             Provides: Auto-restart on code changes (like nodemon) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Lombok (optional, for reducing boilerplate)
+             NODE.JS EQUIVALENT: No direct equivalent (reduces Java boilerplate)
+             Provides: Auto-generates getters/setters, constructors, etc. -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- SpringDoc OpenAPI (Swagger UI)
+             NODE.JS EQUIVALENT: "swagger-ui-express": "^5.0.0"
+             Provides: API documentation UI (Swagger) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+
+        <!-- Spring Boot Security
+             NODE.JS EQUIVALENT: "passport": "^0.6.0" + "passport-jwt": "^0.4.0"
+             Provides: Authentication, authorization, password encoding -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- JWT (JSON Web Token) Library
+             NODE.JS EQUIVALENT: "jsonwebtoken": "^9.0.0"
+             Provides: JWT token creation and verification
+             Note: Three parts needed (api, impl, jackson) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.3</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.3</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.3</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Spring Boot Test
+             NODE.JS EQUIVALENT: "jest": "^29.0.0" (in devDependencies)
+             Provides: Testing framework for unit/integration tests -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- ========================================================================
+         BUILD CONFIGURATION - How to Build/Package the Application
+         NODE.JS EQUIVALENT: "scripts" in package.json
+         ========================================================================
+         spring-boot-maven-plugin:
+         - Packages app into JAR file (executable)
+         - Like: npm run build creates production bundle
+         - Command: mvn clean package (creates .jar file)
+         ======================================================================== -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
