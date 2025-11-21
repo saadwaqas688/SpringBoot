@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { FiSearch, FiPlus, FiUsers } from "react-icons/fi";
+import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 import "./ChatList.css";
 
@@ -14,13 +15,17 @@ function ChatList({
   onSelectGroup,
   onShowContacts,
 }) {
+  const { user, loading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("chats");
 
   useEffect(() => {
-    loadChats();
-    loadGroups();
-  }, []);
+    // Only load chats/groups after auth is ready and user is authenticated
+    if (!loading && user) {
+      loadChats();
+      loadGroups();
+    }
+  }, [loading, user]);
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -38,6 +43,9 @@ function ChatList({
   }, []);
 
   const loadChats = async () => {
+    // Don't load if auth is still loading or user is not authenticated
+    if (loading || !user) return;
+    
     try {
       const response = await api.get("/chats");
       setChats(response.data);
@@ -47,6 +55,9 @@ function ChatList({
   };
 
   const loadGroups = async () => {
+    // Don't load if auth is still loading or user is not authenticated
+    if (loading || !user) return;
+    
     try {
       const response = await api.get("/groups");
       setGroups(response.data);

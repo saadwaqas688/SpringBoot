@@ -2,9 +2,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.SignalR;
 using DotNetMessaging.API.DTOs;
 using DotNetMessaging.API.Models;
 using DotNetMessaging.API.Repositories;
+using DotNetMessaging.API.Hubs;
 using BCrypt.Net;
 
 namespace DotNetMessaging.API.Services;
@@ -20,11 +22,13 @@ public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
+    private readonly IHubContext<ChatHub> _hubContext;
 
-    public AuthService(IUserRepository userRepository, IConfiguration configuration)
+    public AuthService(IUserRepository userRepository, IConfiguration configuration, IHubContext<ChatHub> hubContext)
     {
         _userRepository = userRepository;
         _configuration = configuration;
+        _hubContext = hubContext;
     }
 
     public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
@@ -64,6 +68,9 @@ public class AuthService : IAuthService
         user.IsOnline = true;
         user.LastSeen = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user.Id, user);
+
+        // Notify all connected clients in real-time that this user is now online
+        await _hubContext.Clients.All.SendAsync("UserOnline", user.Id);
 
         var token = GenerateJwtToken(user);
         return new AuthResponse

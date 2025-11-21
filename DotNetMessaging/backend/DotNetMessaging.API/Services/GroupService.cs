@@ -85,6 +85,8 @@ public class GroupService : IGroupService
 
     public async Task<GroupDto> CreateGroupAsync(CreateGroupRequest request, string userId)
     {
+        Console.WriteLine($"[GroupService] CreateGroupAsync - Name: {request.Name}, Description: {request.Description}, UserId: {userId}, MemberIds count: {request.MemberIds?.Count ?? 0}");
+
         var group = new Group
         {
             Name = request.Name,
@@ -93,7 +95,9 @@ public class GroupService : IGroupService
             CreatedAt = DateTime.UtcNow
         };
 
+        Console.WriteLine($"[GroupService] Creating group...");
         await _groupRepository.CreateAsync(group);
+        Console.WriteLine($"[GroupService] Group created with Id: {group.Id}");
 
         // Add creator as admin
         var creatorMember = new GroupMember
@@ -103,11 +107,16 @@ public class GroupService : IGroupService
             Role = GroupRole.Admin,
             JoinedAt = DateTime.UtcNow
         };
+        Console.WriteLine($"[GroupService] Adding creator as admin - UserId: {userId}");
         await _groupMemberRepository.CreateAsync(creatorMember);
 
         // Add other members
-        foreach (var memberId in request.MemberIds.Where(id => id != userId))
+        var otherMembers = request.MemberIds?.Where(id => id != userId).ToList() ?? new List<string>();
+        Console.WriteLine($"[GroupService] Adding {otherMembers.Count} other members");
+        
+        foreach (var memberId in otherMembers)
         {
+            Console.WriteLine($"[GroupService] Adding member - UserId: {memberId}");
             var member = new GroupMember
             {
                 GroupId = group.Id,
@@ -118,7 +127,11 @@ public class GroupService : IGroupService
             await _groupMemberRepository.CreateAsync(member);
         }
 
-        return await GetGroupDtoAsync(group);
+        Console.WriteLine($"[GroupService] Building GroupDto...");
+        var groupDto = await GetGroupDtoAsync(group);
+        Console.WriteLine($"[GroupService] GroupDto created - Id: {groupDto.Id}, Members count: {groupDto.Members.Count}");
+        
+        return groupDto;
     }
 
     public async Task<bool> AddMembersAsync(string groupId, List<string> memberIds, string userId)

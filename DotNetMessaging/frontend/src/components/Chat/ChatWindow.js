@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FiSend, FiSmile, FiPaperclip, FiX } from "react-icons/fi";
 import { format, formatDistanceToNow } from "date-fns";
+import * as signalR from "@microsoft/signalr";
+import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 import signalRService from "../../services/signalRService";
 import MessageBubble from "./MessageBubble";
 import "./ChatWindow.css";
 
 function ChatWindow({ chat, onClose, onChatUpdate }) {
+  const { user: currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
@@ -15,34 +18,90 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
   const [currentChat, setCurrentChat] = useState(chat);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const onChatUpdateRef = useRef(onChatUpdate);
+  const currentChatIdRef = useRef(currentChat?.id);
+
+  // Keep onChatUpdate ref up to date
+  useEffect(() => {
+    onChatUpdateRef.current = onChatUpdate;
+  }, [onChatUpdate]);
 
   useEffect(() => {
     setCurrentChat(chat);
+    currentChatIdRef.current = chat?.id;
   }, [chat]);
 
   useEffect(() => {
     if (!currentChat?.id) return;
 
+    // Clear typing users when chat changes
+    setTypingUsers(new Set());
+
     loadMessages();
-    joinChat();
+    
+    // Ensure SignalR is connected before joining chat
+    const initializeChat = async () => {
+      if (!signalRService.isConnected()) {
+        console.log("Waiting for SignalR connection...");
+        // Wait a bit for connection if not ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      if (signalRService.isConnected()) {
+        await joinChat();
+      } else {
+        console.error("Cannot join chat: SignalR not connected");
+      }
+    };
+    
+    initializeChat();
 
     const handleNewMessageWrapper = (message) => {
       if (message.chatId === currentChat.id) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          // Check if message already exists to prevent duplicates
+          const messageExists = prev.some(m => m.id === message.id);
+          if (messageExists) {
+            console.log("[ChatWindow] Message already exists, skipping duplicate:", message.id);
+            return prev;
+          }
+          return [...prev, message];
+        });
       }
     };
 
     const handleUserTypingWrapper = (chatId, userId, userName, typing) => {
-      if (chatId === currentChat.id) {
+      console.log("🔵 UserTyping event received:", { 
+        chatId, 
+        userId, 
+        userName, 
+        typing,
+        currentChatId: currentChatIdRef.current,
+        currentUserId: currentUser?.id
+      });
+      
+      // Use ref to get current chat ID to avoid closure issues
+      if (chatId === currentChatIdRef.current) {
+        // Filter out current user - don't show "you are typing" to yourself
+        if (userId === currentUser?.id) {
+          console.log("⚠️ Ignoring typing from current user");
+          return;
+        }
+        
+        console.log(`✅ Updating typing indicator: ${userName} is ${typing ? "typing" : "not typing"}`);
         setTypingUsers((prev) => {
           const newSet = new Set(prev);
+          const userKey = userName || userId;
           if (typing) {
-            newSet.add(userName || userId);
+            newSet.add(userKey);
           } else {
-            newSet.delete(userName || userId);
+            newSet.delete(userKey);
           }
+          console.log("📝 Typing users set:", Array.from(newSet));
           return newSet;
         });
+      } else {
+        console.log(`⚠️ Ignoring typing for different chat. Current: ${currentChatIdRef.current}, Received: ${chatId}`);
       }
     };
 
@@ -64,8 +123,8 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
           ...prev,
           otherUser: { ...prev.otherUser, isOnline: true },
         }));
-        if (onChatUpdate) {
-          onChatUpdate({
+        if (onChatUpdateRef.current) {
+          onChatUpdateRef.current({
             ...currentChat,
             otherUser: { ...currentChat.otherUser, isOnline: true },
           });
@@ -83,8 +142,8 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
             lastSeen: new Date().toISOString(),
           },
         }));
-        if (onChatUpdate) {
-          onChatUpdate({
+        if (onChatUpdateRef.current) {
+          onChatUpdateRef.current({
             ...currentChat,
             otherUser: {
               ...currentChat.otherUser,
@@ -96,14 +155,63 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
       }
     };
 
-    signalRService.on("NewMessage", handleNewMessageWrapper);
-    signalRService.on("UserTyping", handleUserTypingWrapper);
-    signalRService.on("MessageReactionUpdated", handleReactionUpdateWrapper);
-    signalRService.on("MessageDeleted", handleMessageDeletedWrapper);
-    signalRService.on("UserOnline", handleUserOnlineWrapper);
-    signalRService.on("UserOffline", handleUserOfflineWrapper);
+    // Register event handlers AFTER ensuring connection is ready
+    const registerHandlers = () => {
+      if (signalRService.isConnected()) {
+        console.log("🔌 Registering SignalR event handlers for chat:", currentChatIdRef.current);
+        signalRService.on("NewMessage", handleNewMessageWrapper);
+        signalRService.on("UserTyping", handleUserTypingWrapper);
+        signalRService.on("MessageReactionUpdated", handleReactionUpdateWrapper);
+        signalRService.on("MessageDeleted", handleMessageDeletedWrapper);
+        signalRService.on("UserOnline", handleUserOnlineWrapper);
+        signalRService.on("UserOffline", handleUserOfflineWrapper);
+        console.log("✅ All event handlers registered");
+        return true;
+      } else {
+        console.warn("⚠️ Cannot register handlers: SignalR not connected");
+        return false;
+      }
+    };
+
+    // Listen for connection state changes and re-register handlers on reconnect
+    const connection = signalRService.getConnection();
+    const handleConnectionStateChange = () => {
+      if (connection?.state === signalR.HubConnectionState.Connected) {
+        console.log("🔌 Connection state changed to Connected, re-registering handlers");
+        registerHandlers();
+      }
+    };
+
+    if (connection) {
+      connection.onclose(() => {
+        console.log("❌ SignalR connection closed");
+      });
+      connection.onreconnecting(() => {
+        console.log("🔄 SignalR reconnecting...");
+      });
+      connection.onreconnected(() => {
+        console.log("✅ SignalR reconnected, re-registering handlers");
+        registerHandlers();
+        // Rejoin chat after reconnection
+        joinChat();
+      });
+    }
+
+    // Register handlers after a short delay to ensure connection is ready
+    const handlerTimeout = setTimeout(() => {
+      if (!registerHandlers()) {
+        // If not connected, try again after a longer delay
+        setTimeout(() => registerHandlers(), 1000);
+      }
+    }, 100);
+
+    // Also register immediately if already connected
+    if (signalRService.isConnected()) {
+      registerHandlers();
+    }
 
     return () => {
+      clearTimeout(handlerTimeout);
       leaveChat();
       signalRService.off("NewMessage", handleNewMessageWrapper);
       signalRService.off("UserTyping", handleUserTypingWrapper);
@@ -112,11 +220,18 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
       signalRService.off("UserOnline", handleUserOnlineWrapper);
       signalRService.off("UserOffline", handleUserOfflineWrapper);
     };
-  }, [currentChat?.id, onChatUpdate]);
+  }, [currentChat?.id, currentUser?.id]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Scroll when typing indicator appears/disappears
+  useEffect(() => {
+    if (typingUsers.size > 0) {
+      scrollToBottom();
+    }
+  }, [typingUsers.size]);
 
   const loadMessages = async () => {
     try {
@@ -131,7 +246,18 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
 
   const joinChat = async () => {
     if (currentChat?.id) {
-      await signalRService.invoke("JoinChat", currentChat.id);
+      try {
+        // Wait for SignalR connection to be ready
+        if (!signalRService.isConnected()) {
+          console.warn("SignalR not connected, cannot join chat");
+          return;
+        }
+        
+        await signalRService.invoke("JoinChat", currentChat.id);
+        console.log(`✅ Successfully joined chat group: ${currentChat.id}`);
+      } catch (error) {
+        console.error("❌ Failed to join chat:", error);
+      }
     }
   };
 
@@ -152,7 +278,16 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
         replyToMessageId: replyingTo?.id,
       });
 
-      setMessages((prev) => [...prev, response.data]);
+      // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
+      setMessages((prev) => {
+        const messageExists = prev.some(m => m.id === response.data.id);
+        if (messageExists) {
+          console.log("[ChatWindow] Message already exists, skipping:", response.data.id);
+          return prev;
+        }
+        return [...prev, response.data];
+      });
+      
       setNewMessage("");
       setReplyingTo(null);
       stopTyping();
@@ -162,25 +297,53 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
   };
 
   const handleTyping = () => {
+    const chatId = currentChat?.id;
+    if (!chatId) {
+      console.warn("Cannot send typing indicator: no chat ID");
+      return;
+    }
+
+    // Check if SignalR connection is ready
+    if (!signalRService.isConnected()) {
+      console.warn("Cannot send typing indicator: SignalR not connected");
+      return;
+    }
+
     if (!isTyping) {
       setIsTyping(true);
-      signalRService.invoke("SendTyping", currentChat?.id, true);
+      console.log(`Sending typing indicator: true for chat ${chatId}`);
+      signalRService.invoke("SendTyping", chatId, true)
+        .then(() => console.log("Typing indicator sent successfully"))
+        .catch((error) => {
+          console.error("Failed to send typing indicator:", error);
+        });
     }
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
+    // Increase timeout to 3 seconds for better UX
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      signalRService.invoke("SendTyping", currentChat?.id, false);
-    }, 1000);
+      console.log(`Sending typing indicator: false for chat ${chatId}`);
+      signalRService.invoke("SendTyping", chatId, false)
+        .then(() => console.log("Typing stop indicator sent successfully"))
+        .catch((error) => {
+          console.error("Failed to stop typing indicator:", error);
+        });
+    }, 3000);
   };
 
   const stopTyping = () => {
+    const chatId = currentChat?.id;
+    if (!chatId) return;
+
     if (isTyping) {
       setIsTyping(false);
-      signalRService.invoke("SendTyping", currentChat?.id, false);
+      signalRService.invoke("SendTyping", chatId, false).catch((error) => {
+        console.error("Failed to stop typing indicator:", error);
+      });
     }
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -200,7 +363,15 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setMessages((prev) => [...prev, response.data]);
+      // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
+      setMessages((prev) => {
+        const messageExists = prev.some(m => m.id === response.data.id);
+        if (messageExists) {
+          console.log("[ChatWindow] File message already exists, skipping:", response.data.id);
+          return prev;
+        }
+        return [...prev, response.data];
+      });
     } catch (error) {
       console.error("Failed to upload file:", error);
       alert("Failed to upload file. Please try again.");
@@ -272,7 +443,7 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
         {typingUsers.size > 0 && (
           <div className="typing-indicator">
             {Array.from(typingUsers).map((userName, index) => (
-              <span key={index}>{userName} is typing...</span>
+              <span key={index}>{userName || "Someone"} is typing...</span>
             ))}
           </div>
         )}

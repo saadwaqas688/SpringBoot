@@ -30,9 +30,37 @@ public class GroupsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<GroupDto>> CreateGroup([FromBody] CreateGroupRequest request)
     {
+        Console.WriteLine($"[CreateGroup] Request received - Name: {request.Name}, Description: {request.Description}, MemberIds: {string.Join(", ", request.MemberIds ?? new List<string>())}");
+        
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            Console.WriteLine("[CreateGroup] ERROR: Group name is required");
+            return BadRequest("Group name is required");
+        }
+
+        // Allow creating a group even without additional members (creator will be the only member)
+        if (request.MemberIds == null)
+        {
+            request.MemberIds = new List<string>();
+        }
+        
+        Console.WriteLine($"[CreateGroup] MemberIds count: {request.MemberIds.Count}");
+
         var userId = GetCurrentUserId();
-        var group = await _groupService.CreateGroupAsync(request, userId);
-        return Ok(group);
+        Console.WriteLine($"[CreateGroup] Current UserId: {userId}");
+        
+        try
+        {
+            var group = await _groupService.CreateGroupAsync(request, userId);
+            Console.WriteLine($"[CreateGroup] Group created successfully - Id: {group.Id}, Name: {group.Name}");
+            return Ok(group);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CreateGroup] ERROR: {ex.Message}");
+            Console.WriteLine($"[CreateGroup] StackTrace: {ex.StackTrace}");
+            return StatusCode(500, "An error occurred while creating the group");
+        }
     }
 
     [HttpPost("{groupId}/members")]

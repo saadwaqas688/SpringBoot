@@ -11,7 +11,13 @@ using DotNetMessaging.API.Repositories;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // ASP.NET Core uses camelCase by default, so configure to accept both
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true; // Accept both camelCase and PascalCase
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase; // Output camelCase
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -85,10 +91,39 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
+                
+                Console.WriteLine($"[JWT] OnMessageReceived - Path: {path}, HasToken: {!string.IsNullOrEmpty(accessToken)}");
+                
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
                 {
                     context.Token = accessToken;
+                    Console.WriteLine($"[JWT] Token extracted from query string for SignalR connection");
                 }
+                else
+                {
+                    // Fallback: try to get token from Authorization header
+                    var authHeader = context.Request.Headers["Authorization"].ToString();
+                    if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+                    {
+                        context.Token = authHeader.Substring("Bearer ".Length).Trim();
+                        Console.WriteLine($"[JWT] Token extracted from Authorization header");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[JWT] WARNING: No token found for SignalR connection");
+                    }
+                }
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"[JWT] Authentication failed: {context.Exception?.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var userId = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                Console.WriteLine($"[JWT] Token validated successfully. UserId: {userId}");
                 return Task.CompletedTask;
             }
         };
@@ -115,6 +150,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<ChatHub>("/chathub");
+
+// Map SignalR hub with authorization requirement
+app.MapHub<ChatHub>("/chathub")
+    .RequireAuthorization();
 
 app.Run("http://localhost:5000");

@@ -1,0 +1,39 @@
+@model UpdateDiscussionPostDto
+@{
+    ViewData["Title"] = "Edit Post";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">Edit Post</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Update" asp-route-id="@ViewBag.PostId" asp-route-contentId="@ViewBag.ContentId" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Content" class="form-label fw-bold">Post Content *</label>
+                            <textarea asp-for="Content" class="form-control" rows="6" required></textarea>
+                            <span asp-validation-for="Content" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-warning btn-lg">Update Post</button>
+                            <a asp-action="Index" asp-route-contentId="@ViewBag.ContentId" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
+
+
+

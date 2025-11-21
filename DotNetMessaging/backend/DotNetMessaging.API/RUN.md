@@ -59,9 +59,41 @@ New-Item -ItemType Directory -Force -Path "wwwroot\uploads\document"
 
 ### 4. Run the application
 
+**Option 1: Run with auto-restart (Recommended for development)**
+
+```bash
+# Windows PowerShell
+.\watch.ps1
+
+# Windows CMD
+watch.bat
+
+# Or directly
+dotnet watch run
+```
+
+**Option 2: Run without auto-restart**
+
 ```bash
 dotnet run
 ```
+
+**Option 3: Run both backend and frontend together**
+
+```bash
+# From the root directory (DotNetMessaging)
+# Windows PowerShell
+.\start-dev.ps1
+
+# Windows CMD
+start-dev.bat
+```
+
+> **⚠️ IMPORTANT:** 
+> - Use `dotnet watch run` (NOT `dotnet run`) for auto-restart
+> - Make sure you **SAVE** the file (`Ctrl+S`) after making changes
+> - You should see `File changed: ...` and `Restarting...` messages in the console
+> - The frontend already has hot reloading built-in with `npm start`
 
 ### 5. Open Swagger
 

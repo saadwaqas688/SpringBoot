@@ -1,0 +1,144 @@
+@model List<LessonContentDto>
+@{
+    ViewData["Title"] = "Lesson Contents";
+    var lesson = ViewBag.Lesson as LessonDto;
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Lesson Contents</h2>
+            @if (lesson != null)
+            {
+                <p class="text-muted mb-0">Lesson: <strong>@lesson.Title</strong></p>
+            }
+        </div>
+        @if (User.IsInRole("ADMIN"))
+        {
+            <a asp-action="Create" asp-route-lessonId="@ViewBag.LessonId" class="btn btn-primary">Add Content</a>
+        }
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Details</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var content in Model.OrderBy(c => c.Order))
+                    {
+                        <tr>
+                            <td>@content.Order</td>
+                            <td>
+                                @if (content.Type == "slide")
+                                {
+                                    <span class="badge bg-info">Slide</span>
+                                }
+                                else if (content.Type == "video")
+                                {
+                                    <span class="badge bg-danger">Video</span>
+                                }
+                                else if (content.Type == "quiz")
+                                {
+                                    <span class="badge bg-warning">Quiz</span>
+                                }
+                                else if (content.Type == "discussion")
+                                {
+                                    <span class="badge bg-success">Discussion</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@content.Type</span>
+                                }
+                            </td>
+                            <td><strong>@content.Title</strong></td>
+                            <td>
+                                @if (content.Data != null)
+                                {
+                                    @if (content.Type == "slide")
+                                    {
+                                        <small class="text-muted">
+                                            @if (!string.IsNullOrEmpty(content.Data.Text))
+                                            {
+                                                <text>Text: @(content.Data.Text.Length > 50 ? content.Data.Text.Substring(0, 50) + "..." : content.Data.Text)</text>
+                                            }
+                                            @if (!string.IsNullOrEmpty(content.Data.ImageUrl))
+                                            {
+                                                <text> | Image URL provided</text>
+                                            }
+                                        </small>
+                                    }
+                                    else if (content.Type == "video")
+                                    {
+                                        <small class="text-muted">
+                                            @if (!string.IsNullOrEmpty(content.Data.VideoUrl))
+                                            {
+                                                <text>Video URL provided</text>
+                                            }
+                                            @if (content.Data.Duration.HasValue)
+                                            {
+                                                <text> | Duration: @content.Data.Duration seconds</text>
+                                            }
+                                        </small>
+                                    }
+                                    else if (content.Type == "quiz")
+                                    {
+                                        <small class="text-muted">
+                                            @if (!string.IsNullOrEmpty(content.Data.Question))
+                                            {
+                                                <text>Question: @(content.Data.Question.Length > 50 ? content.Data.Question.Substring(0, 50) + "..." : content.Data.Question)</text>
+                                            }
+                                            @if (content.Data.Options != null && content.Data.Options.Any())
+                                            {
+                                                <text> | @content.Data.Options.Count options</text>
+                                            }
+                                        </small>
+                                    }
+                                    else if (content.Type == "discussion")
+                                    {
+                                        <small class="text-muted">Discussion forum</small>
+                                    }
+                                }
+                            </td>
+                            <td>
+                                @if (User.IsInRole("ADMIN"))
+                                {
+                                    <a asp-action="Edit" asp-route-id="@content.Id" class="btn btn-sm btn-warning">Edit</a>
+                                    <form asp-action="Delete" asp-route-id="@content.Id" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this content?');">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <h4>No Content Found</h4>
+            <p>This lesson doesn't have any content yet.</p>
+            @if (User.IsInRole("ADMIN"))
+            {
+                <a asp-action="Create" asp-route-lessonId="@ViewBag.LessonId" class="btn btn-primary">Add First Content</a>
+            }
+        </div>
+    }
+
+    <div class="mt-4">
+        <a asp-controller="Lesson" asp-action="Index" asp-route-courseId="@(lesson?.CourseId ?? 0)" class="btn btn-secondary">Back to Lessons</a>
+    </div>
+</div>
+
+
+

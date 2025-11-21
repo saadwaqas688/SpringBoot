@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import api from "../services/api";
+import signalRService from "../services/signalRService";
 
 const AuthContext = createContext();
 
@@ -18,6 +19,8 @@ export function AuthProvider({ children }) {
     if (token && userData) {
       setUser(JSON.parse(userData));
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      // Start SignalR connection if user is already logged in
+      signalRService.startConnection(token).catch(console.error);
     }
     setLoading(false);
   }, []);
@@ -42,6 +45,15 @@ export function AuthProvider({ children }) {
       localStorage.setItem("user", JSON.stringify(user));
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       setUser(user);
+
+      // Start SignalR connection immediately after login to receive real-time notifications
+      try {
+        await signalRService.startConnection(token);
+        console.log("SignalR connection established");
+      } catch (signalRError) {
+        console.error("Failed to start SignalR connection:", signalRError);
+        // Don't fail login if SignalR fails, just log the error
+      }
 
       return { success: true };
     } catch (error) {
@@ -97,6 +109,15 @@ export function AuthProvider({ children }) {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       setUser(user);
 
+      // Start SignalR connection immediately after registration to receive real-time notifications
+      try {
+        await signalRService.startConnection(token);
+        console.log("SignalR connection established");
+      } catch (signalRError) {
+        console.error("Failed to start SignalR connection:", signalRError);
+        // Don't fail registration if SignalR fails, just log the error
+      }
+
       return { success: true };
     } catch (error) {
       console.error("Registration error:", error);
@@ -122,6 +143,8 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    // Stop SignalR connection on logout
+    signalRService.stopConnection().catch(console.error);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     delete api.defaults.headers.common["Authorization"];

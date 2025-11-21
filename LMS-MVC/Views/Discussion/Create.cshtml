@@ -1,0 +1,51 @@
+@model CreateDiscussionPostDto
+@{
+    ViewData["Title"] = ViewBag.ParentPostId != null ? "Reply to Post" : "Create New Post";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">@(ViewBag.ParentPostId != null ? "Reply to Post" : "Create New Post")</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                        
+                        <input type="hidden" asp-for="ContentId" />
+                        <input type="hidden" asp-for="LessonId" />
+                        @if (ViewBag.ParentPostId != null)
+                        {
+                            <input type="hidden" asp-for="ParentPostId" value="@ViewBag.ParentPostId" />
+                            <div class="alert alert-info">
+                                <strong>Replying to a post</strong>
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label asp-for="Content" class="form-label fw-bold">@(ViewBag.ParentPostId != null ? "Your Reply" : "Post Content") *</label>
+                            <textarea asp-for="Content" class="form-control" rows="6" required placeholder="@(ViewBag.ParentPostId != null ? "Write your reply..." : "Share your thoughts, ask questions, or start a discussion...")"></textarea>
+                            <span asp-validation-for="Content" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                @(ViewBag.ParentPostId != null ? "Post Reply" : "Create Post")
+                            </button>
+                            <a asp-action="Index" asp-route-contentId="@Model.ContentId" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
+
+
+

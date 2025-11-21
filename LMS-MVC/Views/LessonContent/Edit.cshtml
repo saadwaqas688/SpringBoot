@@ -1,0 +1,137 @@
+@model UpdateLessonContentDto
+@{
+    ViewData["Title"] = "Edit Lesson Content";
+}
+
+<div class="container mt-4">
+    <h2>Edit Lesson Content</h2>
+    
+    <form asp-action="Edit" asp-route-id="@ViewBag.ContentId" method="post" id="contentForm">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        
+        <!-- Content Basic Info -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Content Information</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">Type</label>
+                        <input type="text" class="form-control" value="@Model.Type" disabled />
+                        <input type="hidden" asp-for="Type" />
+                        <small class="text-muted">Content type cannot be changed</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Order" class="form-label fw-bold">Order *</label>
+                        <input asp-for="Order" type="number" class="form-control" required min="1" />
+                        <span asp-validation-for="Order" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Title" class="form-label fw-bold">Title *</label>
+                        <input asp-for="Title" class="form-control" required />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Type-Specific Fields -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">Content Data</h4>
+            </div>
+            <div class="card-body">
+                @if (Model.Type == "slide")
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Text</label>
+                        <textarea name="Data.Text" class="form-control" rows="6">@(Model.Data?.Text ?? "")</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Image URL</label>
+                        <input type="url" name="Data.ImageUrl" class="form-control" value="@(Model.Data?.ImageUrl ?? "")" />
+                    </div>
+                }
+                else if (Model.Type == "video")
+                {
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label fw-bold">Video URL</label>
+                            <input type="url" name="Data.VideoUrl" class="form-control" value="@(Model.Data?.VideoUrl ?? "")" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Duration (seconds)</label>
+                            <input type="number" name="Data.Duration" class="form-control" min="1" value="@(Model.Data?.Duration ?? 0)" />
+                        </div>
+                    </div>
+                }
+                else if (Model.Type == "quiz")
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Question</label>
+                        <textarea name="Data.Question" class="form-control" rows="3">@(Model.Data?.Question ?? "")</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Options (one per line)</label>
+                        <textarea id="quizOptions" class="form-control" rows="4">@(Model.Data?.Options != null ? string.Join("\n", Model.Data.Options) : "")</textarea>
+                        <small class="text-muted">Enter each option on a new line</small>
+                        <div id="optionsContainer"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Correct Answer</label>
+                        <input type="text" name="Data.CorrectAnswer" class="form-control" value="@(Model.Data?.CorrectAnswer ?? "")" />
+                    </div>
+                }
+                else if (Model.Type == "discussion")
+                {
+                    <div class="alert alert-info">
+                        Discussion content type. Users can post and reply to discussions in this content.
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button type="submit" class="btn btn-primary btn-lg">Update Content</button>
+            <a asp-action="Index" asp-route-lessonId="@ViewBag.LessonId" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        // Handle quiz options textarea for quiz type
+        @if (Model.Type == "quiz")
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                const optionsTextarea = document.getElementById('quizOptions');
+                const container = document.getElementById('optionsContainer');
+                
+                function updateOptions() {
+                    container.innerHTML = '';
+                    const value = optionsTextarea.value;
+                    if (value) {
+                        const options = value.split('\n').filter(opt => opt.trim() !== '');
+                        options.forEach((opt, index) => {
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = `Data.Options[${index}]`;
+                            hiddenInput.value = opt.trim();
+                            container.appendChild(hiddenInput);
+                        });
+                    }
+                }
+                
+                optionsTextarea.addEventListener('input', updateOptions);
+                updateOptions(); // Initial update
+            });
+            </text>
+        }
+    </script>
+}
+
+
+

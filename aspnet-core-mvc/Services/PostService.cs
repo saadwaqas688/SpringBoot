@@ -65,3 +65,11 @@ public class PostService : IPostService
     }
 }
 
+  "_id": "course55",
+  "title": "JavaScript Mastery",
+  "description": "Complete JS course",
+  "thumbnailUrl": "https://cdn.example.com/course.png",
+  "category": "Programming",
+  "level": "Beginner",
+  "createdAt": "2025-01-10T10:00:00Z",
+  "updatedAt": "2025-01-10T10:00:00Z"

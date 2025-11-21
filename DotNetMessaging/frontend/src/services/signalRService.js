@@ -40,12 +40,16 @@ class SignalRService {
   on(event, callback) {
     if (this.connection) {
       this.connection.on(event, callback);
+      console.log(`✅ Registered SignalR event handler: ${event}`);
+    } else {
+      console.warn(`⚠️ Cannot register event handler ${event}: connection not available`);
     }
   }
 
   off(event, callback) {
     if (this.connection) {
       this.connection.off(event, callback);
+      console.log(`❌ Unregistered SignalR event handler: ${event}`);
     }
   }
 

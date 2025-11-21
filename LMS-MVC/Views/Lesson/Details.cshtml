@@ -1,0 +1,282 @@
+@model LessonDto
+@{
+    ViewData["Title"] = Model.Title;
+    var contents = Model.Contents.OrderBy(c => c.Order).ToList();
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>@Model.Title</h2>
+            <p class="text-muted mb-0">@Model.Description</p>
+        </div>
+        <div>
+            <a asp-controller="Course" asp-action="Details" asp-route-id="@Model.CourseId" class="btn btn-secondary">Back to Course</a>
+            @if (User.IsInRole("ADMIN"))
+            {
+                <a asp-controller="LessonContent" asp-action="Create" asp-route-lessonId="@Model.Id" class="btn btn-primary">Add Content</a>
+            }
+        </div>
+    </div>
+
+    @if (contents.Any())
+    {
+        <!-- Content Navigation -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Lesson Contents (@contents.Count items)</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    @for (int i = 0; i < contents.Count; i++)
+                    {
+                        var content = contents[i];
+                        <a href="#content-@content.Id" class="list-group-item list-group-item-action @(i == 0 ? "active" : "")" onclick="showContent(@i, @content.Id)">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">@content.Order. @content.Title</h6>
+                                <span class="badge bg-@(content.Type == "slide" ? "info" : content.Type == "video" ? "danger" : content.Type == "quiz" ? "warning" : "success") rounded-pill">
+                                    @content.Type
+                                </span>
+                            </div>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Display Area -->
+        <div id="contentDisplay">
+            @foreach (var content in contents)
+            {
+                <div id="content-@content.Id" class="content-item" style="display: @(content == contents.First() ? "block" : "none");">
+                    <div class="card mb-4">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">@content.Order. @content.Title</h5>
+                            <span class="badge bg-@(content.Type == "slide" ? "info" : content.Type == "video" ? "danger" : content.Type == "quiz" ? "warning" : "success")">
+                                @content.Type.ToUpper()
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            @if (content.Type == "slide")
+                            {
+                                <!-- Slide Content -->
+                                @if (!string.IsNullOrEmpty(content.Data?.ImageUrl))
+                                {
+                                    <div class="mb-3 text-center">
+                                        <img src="@content.Data.ImageUrl" class="img-fluid rounded" alt="@content.Title" style="max-height: 500px;" />
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(content.Data?.Text))
+                                {
+                                    <div class="slide-text">
+                                        <p class="lead">@Html.Raw(content.Data.Text.Replace("\n", "<br/>"))</p>
+                                    </div>
+                                }
+                            }
+                            else if (content.Type == "video")
+                            {
+                                <!-- Video Content -->
+                                @if (!string.IsNullOrEmpty(content.Data?.VideoUrl))
+                                {
+                                    var videoUrl = content.Data.VideoUrl;
+                                    // Convert YouTube URL to embed format if needed
+                                    if (videoUrl.Contains("youtube.com/watch?v="))
+                                    {
+                                        var videoId = videoUrl.Split("v=")[1].Split("&")[0];
+                                        videoUrl = $"https://www.youtube.com/embed/{videoId}";
+                                    }
+                                    else if (videoUrl.Contains("youtu.be/"))
+                                    {
+                                        var videoId = videoUrl.Split("youtu.be/")[1].Split("?")[0];
+                                        videoUrl = $"https://www.youtube.com/embed/{videoId}";
+                                    }
+                                    <div class="ratio ratio-16x9 mb-3">
+                                        <iframe src="@videoUrl" allowfullscreen style="border: 0;"></iframe>
+                                    </div>
+                                    @if (content.Data.Duration.HasValue)
+                                    {
+                                        var minutes = content.Data.Duration.Value / 60;
+                                        var seconds = content.Data.Duration.Value % 60;
+                                        <p class="text-muted">
+                                            <strong>Duration:</strong> 
+                                            @if (minutes > 0)
+                                            {
+                                                <text>@minutes min @seconds sec</text>
+                                            }
+                                            else
+                                            {
+                                                <text>@seconds sec</text>
+                                            }
+                                        </p>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="alert alert-warning">Video URL not available</div>
+                                }
+                            }
+                            else if (content.Type == "quiz")
+                            {
+                                <!-- Quiz Content -->
+                                @if (!string.IsNullOrEmpty(content.Data?.Question))
+                                {
+                                    <div class="quiz-container">
+                                        <div class="card mb-3">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Question:</h5>
+                                                <p class="card-text lead">@content.Data.Question</p>
+                                            </div>
+                                        </div>
+                                        
+                                        @if (content.Data.Options != null && content.Data.Options.Any())
+                                        {
+                                            <div class="quiz-options">
+                                                <h6 class="mb-3">Select an answer:</h6>
+                                                <div class="list-group">
+                                                    @foreach (var option in content.Data.Options)
+                                                    {
+                                                        <button type="button" 
+                                                                class="list-group-item list-group-item-action quiz-option" 
+                                                                data-option="@option"
+                                                                data-correct="@content.Data.CorrectAnswer"
+                                                                onclick="selectQuizOption(this, '@content.Data.CorrectAnswer')">
+                                                            @option
+                                                        </button>
+                                                    }
+                                                </div>
+                                                <div id="quiz-result-@content.Id" class="mt-3"></div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else if (content.Type == "discussion")
+                            {
+                                <!-- Discussion Content -->
+                                <div class="discussion-container">
+                                    <div class="alert alert-info">
+                                        <h5>Discussion Forum</h5>
+                                        <p>Share your thoughts and questions about this lesson content.</p>
+                                    </div>
+                                    <a asp-controller="Discussion" asp-action="Index" asp-route-contentId="@content.Id" class="btn btn-primary">
+                                        View Discussion Posts
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-secondary" id="prevBtn" onclick="previousContent()" style="display: none;">← Previous</button>
+            <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextContent()">Next →</button>
+        </div>
+
+        <!-- Complete Lesson Button -->
+        @if (!User.IsInRole("ADMIN"))
+        {
+            <div class="text-center mt-4">
+                <form asp-controller="LessonProgress" asp-action="Update" method="post" class="d-inline">
+                    <input type="hidden" name="lessonId" value="@Model.Id" />
+                    <input type="hidden" name="courseId" value="@Model.CourseId" />
+                    <input type="hidden" name="isCompleted" value="true" />
+                    <button type="submit" class="btn btn-success btn-lg">✓ Mark as Completed</button>
+                </form>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <h4>No Content Available</h4>
+            <p>This lesson doesn't have any content yet.</p>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        let currentIndex = 0;
+        const totalContents = @contents.Count;
+        const contentIds = [@string.Join(",", contents.Select(c => c.Id))];
+
+        function showContent(index, contentId) {
+            // Hide all content
+            document.querySelectorAll('.content-item').forEach(item => {
+                item.style.display = 'none';
+            });
+            
+            // Show selected content
+            const selectedContent = document.getElementById('content-' + contentId);
+            if (selectedContent) {
+                selectedContent.style.display = 'block';
+            }
+            
+            // Update navigation
+            currentIndex = index;
+            updateNavigation();
+            
+            // Update active state in navigation list
+            document.querySelectorAll('.list-group-item').forEach((item, i) => {
+                item.classList.remove('active');
+                if (i === index) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        function nextContent() {
+            if (currentIndex < totalContents - 1) {
+                showContent(currentIndex + 1, contentIds[currentIndex + 1]);
+            }
+        }
+
+        function previousContent() {
+            if (currentIndex > 0) {
+                showContent(currentIndex - 1, contentIds[currentIndex - 1]);
+            }
+        }
+
+        function updateNavigation() {
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            
+            prevBtn.style.display = currentIndex > 0 ? 'block' : 'none';
+            nextBtn.style.display = currentIndex < totalContents - 1 ? 'block' : 'none';
+            
+            if (currentIndex === totalContents - 1) {
+                nextBtn.textContent = 'Finish';
+            } else {
+                nextBtn.textContent = 'Next →';
+            }
+        }
+
+        function selectQuizOption(button, correctAnswer) {
+            const selectedOption = button.dataset.option;
+            const resultDiv = button.closest('.quiz-container').querySelector('[id^="quiz-result"]');
+            const allOptions = button.parentElement.querySelectorAll('.quiz-option');
+            
+            // Disable all options
+            allOptions.forEach(opt => {
+                opt.disabled = true;
+                opt.classList.remove('list-group-item-primary');
+            });
+            
+            // Highlight selected
+            button.classList.add('list-group-item-primary');
+            
+            // Show result
+            if (selectedOption === correctAnswer) {
+                resultDiv.innerHTML = '<div class="alert alert-success"><strong>✓ Correct!</strong> Well done!</div>';
+            } else {
+                resultDiv.innerHTML = '<div class="alert alert-danger"><strong>✗ Incorrect.</strong> The correct answer is: <strong>' + correctAnswer + '</strong></div>';
+            }
+        }
+
+        // Initialize navigation
+        updateNavigation();
+    </script>
+}

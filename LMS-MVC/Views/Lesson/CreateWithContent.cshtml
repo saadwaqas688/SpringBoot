@@ -1,0 +1,228 @@
+@model CreateLessonWithContentDto
+@{
+    ViewData["Title"] = "Create Lesson with Content";
+}
+
+<div class="container mt-4">
+    <h2>Create Lesson with Content</h2>
+    
+    <form asp-action="CreateWithContent" method="post" id="lessonForm">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        
+        <input type="hidden" asp-for="CourseId" value="@(Model?.CourseId ?? ViewBag.CourseId)" />
+        
+        <!-- Lesson Basic Info -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Lesson Information</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Title" class="form-label fw-bold">Lesson Title *</label>
+                        <input asp-for="Title" class="form-control" required value="@(Model?.Title ?? "")" />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Order" class="form-label fw-bold">Order *</label>
+                        <input asp-for="Order" type="number" class="form-control" required min="1" value="@(Model?.Order ?? 1)" />
+                        <span asp-validation-for="Order" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label fw-bold">Description</label>
+                    <textarea asp-for="Description" class="form-control" rows="3">@(Model?.Description ?? "")</textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lesson Contents -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Lesson Contents</h4>
+                <button type="button" class="btn btn-light btn-sm" onclick="addContentItem()">+ Add Content</button>
+            </div>
+            <div class="card-body">
+                <div id="contentItems">
+                    <!-- Content items will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button type="submit" class="btn btn-primary btn-lg">Create Lesson</button>
+            <a asp-action="Index" asp-route-courseId="@(Model?.CourseId ?? ViewBag.CourseId)" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        let contentIndex = 0;
+
+        function addContentItem() {
+            const contentItems = document.getElementById('contentItems');
+            const itemHtml = `
+                <div class="content-item card mb-3" data-index="${contentIndex}">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Content Item #${contentIndex + 1}</h5>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeContentItem(${contentIndex})">Remove</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Type *</label>
+                                <select name="Contents[${contentIndex}].Type" class="form-select content-type" required onchange="updateContentFields(${contentIndex})">
+                                    <option value="">-- Select Type --</option>
+                                    <option value="slide">Slide</option>
+                                    <option value="video">Video</option>
+                                    <option value="quiz">Quiz</option>
+                                    <option value="discussion">Discussion</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Order *</label>
+                                <input type="number" name="Contents[${contentIndex}].Order" class="form-control" required min="1" value="${contentIndex + 1}" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Title *</label>
+                                <input type="text" name="Contents[${contentIndex}].Title" class="form-control" required />
+                            </div>
+                        </div>
+                        
+                        <!-- Slide Fields -->
+                        <div class="content-fields slide-fields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Text</label>
+                                <textarea name="Contents[${contentIndex}].Text" class="form-control" rows="4"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Image URL</label>
+                                <input type="url" name="Contents[${contentIndex}].ImageUrl" class="form-control" />
+                            </div>
+                        </div>
+                        
+                        <!-- Video Fields -->
+                        <div class="content-fields video-fields" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label fw-bold">Video URL *</label>
+                                    <input type="url" name="Contents[${contentIndex}].VideoUrl" class="form-control" />
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Duration (seconds)</label>
+                                    <input type="number" name="Contents[${contentIndex}].Duration" class="form-control" min="1" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Quiz Fields -->
+                        <div class="content-fields quiz-fields" style="display: none;">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Question *</label>
+                                <textarea name="Contents[${contentIndex}].Question" class="form-control quiz-question" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Options (one per line) *</label>
+                                <textarea class="form-control quiz-options-textarea" rows="4" placeholder="Option 1&#10;Option 2&#10;Option 3&#10;Option 4" data-index="${contentIndex}"></textarea>
+                                <small class="text-muted">Enter each option on a new line</small>
+                                <div class="quiz-options-container mt-2" data-index="${contentIndex}"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Correct Answer *</label>
+                                <input type="text" name="Contents[${contentIndex}].CorrectAnswer" class="form-control" />
+                            </div>
+                        </div>
+                        
+                        <!-- Discussion Fields -->
+                        <div class="content-fields discussion-fields" style="display: none;">
+                            <div class="alert alert-info">
+                                Discussion content will be created. Users can post and reply to discussions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            contentItems.insertAdjacentHTML('beforeend', itemHtml);
+            contentIndex++;
+        }
+
+        function removeContentItem(index) {
+            const item = document.querySelector(`.content-item[data-index="${index}"]`);
+            if (item) {
+                item.remove();
+                updateIndices();
+            }
+        }
+
+        function updateContentFields(index) {
+            const item = document.querySelector(`.content-item[data-index="${index}"]`);
+            const typeSelect = item.querySelector('.content-type');
+            const type = typeSelect.value;
+            
+            // Hide all fields
+            item.querySelectorAll('.content-fields').forEach(field => {
+                field.style.display = 'none';
+            });
+            
+            // Show relevant fields
+            if (type === 'slide') {
+                item.querySelector('.slide-fields').style.display = 'block';
+            } else if (type === 'video') {
+                item.querySelector('.video-fields').style.display = 'block';
+            } else if (type === 'quiz') {
+                item.querySelector('.quiz-fields').style.display = 'block';
+            } else if (type === 'discussion') {
+                item.querySelector('.discussion-fields').style.display = 'block';
+            }
+        }
+
+        function updateIndices() {
+            const items = document.querySelectorAll('.content-item');
+            items.forEach((item, newIndex) => {
+                const oldIndex = item.dataset.index;
+                item.dataset.index = newIndex;
+                item.querySelector('.card-header h5').textContent = `Content Item #${newIndex + 1}`;
+                
+                // Update all input names
+                item.querySelectorAll('input, select, textarea').forEach(input => {
+                    if (input.name) {
+                        input.name = input.name.replace(/Contents\[\d+\]/, `Contents[${newIndex}]`);
+                    }
+                });
+            });
+        }
+
+        // Handle quiz options textarea changes
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('quiz-options-textarea')) {
+                const textarea = e.target;
+                const index = textarea.dataset.index;
+                const container = document.querySelector(`.quiz-options-container[data-index="${index}"]`);
+                const value = textarea.value;
+                
+                // Clear existing hidden inputs
+                container.innerHTML = '';
+                
+                if (value) {
+                    const options = value.split('\n').filter(opt => opt.trim() !== '');
+                    options.forEach((opt, optIndex) => {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = `Contents[${index}].Options[${optIndex}]`;
+                        hiddenInput.value = opt.trim();
+                        container.appendChild(hiddenInput);
+                    });
+                }
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('lessonForm').addEventListener('submit', function(e) {
+            // Options are already converted to hidden inputs by the input event handler
+        });
+    </script>
+}
+

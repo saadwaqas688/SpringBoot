@@ -63,9 +63,29 @@ public class ChatHub : Hub
         var userId = GetUserId();
         if (!string.IsNullOrEmpty(userId))
         {
+            // Ensure user is in the chat group before sending typing indicator
+            var groupName = $"Chat_{chatId}";
+            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+            
             var user = await _userService.GetUserByIdAsync(userId);
-            await Clients.GroupExcept($"Chat_{chatId}", Context.ConnectionId)
-                .SendAsync("UserTyping", chatId, userId, user?.Username ?? "User", isTyping);
+            if (user != null)
+            {
+                Console.WriteLine($"[SendTyping] Sending typing indicator - ChatId: {chatId}, UserId: {userId}, Username: {user.Username}, IsTyping: {isTyping}, Group: {groupName}, ConnectionId: {Context.ConnectionId}");
+                
+                // Send to all in the chat group except the sender
+                await Clients.GroupExcept(groupName, Context.ConnectionId)
+                    .SendAsync("UserTyping", chatId, userId, user.Username, isTyping);
+                
+                Console.WriteLine($"[SendTyping] Event sent successfully");
+            }
+            else
+            {
+                Console.WriteLine($"[SendTyping] ERROR: User not found for userId: {userId}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[SendTyping] ERROR: UserId is null or empty");
         }
     }
 
@@ -74,9 +94,28 @@ public class ChatHub : Hub
         var userId = GetUserId();
         if (!string.IsNullOrEmpty(userId))
         {
+            // Ensure user is in the group before sending typing indicator
+            var groupName = $"Group_{groupId}";
+            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+            
             var user = await _userService.GetUserByIdAsync(userId);
-            await Clients.GroupExcept($"Group_{groupId}", Context.ConnectionId)
-                .SendAsync("UserTypingGroup", groupId, userId, user?.Username ?? "User", isTyping);
+            if (user != null)
+            {
+                Console.WriteLine($"[SendGroupTyping] Sending typing indicator - GroupId: {groupId}, UserId: {userId}, Username: {user.Username}, IsTyping: {isTyping}, Group: {groupName}, ConnectionId: {Context.ConnectionId}");
+                
+                await Clients.GroupExcept(groupName, Context.ConnectionId)
+                    .SendAsync("UserTypingGroup", groupId, userId, user.Username, isTyping);
+                
+                Console.WriteLine($"[SendGroupTyping] Event sent successfully");
+            }
+            else
+            {
+                Console.WriteLine($"[SendGroupTyping] ERROR: User not found for userId: {userId}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[SendGroupTyping] ERROR: UserId is null or empty");
         }
     }
 
@@ -87,7 +126,47 @@ public class ChatHub : Hub
 
     private string? GetUserId()
     {
-        return Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // Debug: Check if user is authenticated
+        if (Context.User == null)
+        {
+            Console.WriteLine($"[GetUserId] ERROR: Context.User is null. ConnectionId: {Context.ConnectionId}");
+            Console.WriteLine($"[GetUserId] Request Path: {Context.GetHttpContext()?.Request?.Path}");
+            Console.WriteLine($"[GetUserId] Query String: {Context.GetHttpContext()?.Request?.QueryString}");
+            
+            // Try to get token from query string as fallback
+            var queryString = Context.GetHttpContext()?.Request?.Query;
+            var token = queryString?["access_token"].ToString();
+            if (!string.IsNullOrEmpty(token))
+            {
+                Console.WriteLine($"[GetUserId] Token found in query string, but user not authenticated");
+            }
+            return null;
+        }
+
+        // Check if user has claims
+        if (!Context.User.Claims.Any())
+        {
+            Console.WriteLine($"[GetUserId] ERROR: Context.User has no claims. ConnectionId: {Context.ConnectionId}");
+            return null;
+        }
+
+        // Try to get user ID from claims
+        var userId = Context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            Console.WriteLine($"[GetUserId] ERROR: ClaimTypes.NameIdentifier not found. ConnectionId: {Context.ConnectionId}");
+            Console.WriteLine($"[GetUserId] Available claims:");
+            foreach (var claim in Context.User.Claims)
+            {
+                Console.WriteLine($"[GetUserId]   - {claim.Type}: {claim.Value}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[GetUserId] UserId found: {userId}");
+        }
+
+        return userId;
     }
 
     private async Task UpdateUserOnlineStatus(string userId, bool isOnline)

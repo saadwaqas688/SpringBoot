@@ -1,0 +1,42 @@
+@model List<LessonDto>
+@{
+    ViewData["Title"] = "Lessons";
+}
+
+<h2>Lessons</h2>
+
+@if (User.IsInRole("ADMIN"))
+{
+    <div class="mb-3">
+        <a asp-action="Create" asp-route-courseId="@ViewBag.CourseId" class="btn btn-primary">Add New Lesson</a>
+        <a asp-action="CreateWithContent" asp-route-courseId="@ViewBag.CourseId" class="btn btn-success">Create Lesson with Content</a>
+    </div>
+}
+
+<div class="list-group">
+    @foreach (var lesson in Model.OrderBy(l => l.Order))
+    {
+        <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">@lesson.Order. @lesson.Title</h5>
+                <div>
+                    @if (!User.IsInRole("ADMIN"))
+                    {
+                        <a asp-action="Details" asp-route-id="@lesson.Id" class="btn btn-sm btn-success">Start</a>
+                    }
+                    else
+                    {
+                        <a asp-action="Details" asp-route-id="@lesson.Id" class="btn btn-sm btn-primary">View</a>
+                        <a asp-action="Edit" asp-route-id="@lesson.Id" class="btn btn-sm btn-warning">Edit</a>
+                        <form asp-action="Delete" asp-route-id="@lesson.Id" method="post" class="d-inline" onsubmit="return confirm('Are you sure?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    }
+                </div>
+            </div>
+            <p class="mb-1">@lesson.Description</p>
+            <small>Contents: @lesson.Contents.Count</small>
+        </div>
+    }
+</div>
+

@@ -12,7 +12,13 @@ import ChatApp from "./components/ChatApp";
 import "./App.css";
 
 function PrivateRoute({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  // Wait for auth to finish loading before checking if user is logged in
+  if (loading) {
+    return <div>Loading...</div>; // or a loading spinner component
+  }
+  
   return user ? children : <Navigate to="/login" />;
 }
 

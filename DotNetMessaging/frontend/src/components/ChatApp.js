@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import signalRService from "../services/signalRService";
 import api from "../services/api";
@@ -10,7 +10,7 @@ import CreateGroupModal from "./Chat/CreateGroupModal";
 import "./ChatApp.css";
 
 function ChatApp() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [chats, setChats] = useState([]);
@@ -18,18 +18,29 @@ function ChatApp() {
   const [showContacts, setShowContacts] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
 
+  // Memoize the onChatUpdate callback to prevent unnecessary re-renders
+  const handleChatUpdate = useCallback((updatedChat) => {
+    setSelectedChat(updatedChat);
+  }, []);
+
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      signalRService.startConnection(token).catch(console.error);
+    // Only start SignalR connection after auth is ready and user is authenticated
+    if (!loading && user) {
+      const token = localStorage.getItem("token");
+      if (token) {
+        signalRService.startConnection(token).catch(console.error);
+      }
     }
 
     return () => {
       signalRService.stopConnection();
     };
-  }, []);
+  }, [loading, user]);
 
   useEffect(() => {
+    // Only set up API refresh handlers after auth is ready
+    if (loading || !user) return;
+
     const refreshChatList = async () => {
       try {
         const chatsResponse = await api.get("/chats");
@@ -142,7 +153,7 @@ function ChatApp() {
       signalRService.off("UserOnline");
       signalRService.off("UserOffline");
     };
-  }, []);
+  }, [loading, user]);
 
   return (
     <div className="chat-app">
@@ -178,7 +189,7 @@ function ChatApp() {
           <ChatWindow
             chat={selectedChat}
             onClose={() => setSelectedChat(null)}
-            onChatUpdate={(updatedChat) => setSelectedChat(updatedChat)}
+            onChatUpdate={handleChatUpdate}
           />
         ) : selectedGroup ? (
           <GroupChatWindow

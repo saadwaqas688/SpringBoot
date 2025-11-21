@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FiX, FiUserPlus } from "react-icons/fi";
 import api from "../../services/api";
+import signalRService from "../../services/signalRService";
 import "./ContactsModal.css";
 
 function ContactsModal({ isOpen, onClose, onStartChat, onCreateGroup }) {
@@ -14,6 +15,53 @@ function ContactsModal({ isOpen, onClose, onStartChat, onCreateGroup }) {
       loadContacts();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    // Listen for real-time user online/offline status updates
+    const handleUserOnline = (userId) => {
+      setContacts((prev) =>
+        prev.map((contact) =>
+          contact.id === userId
+            ? { ...contact, isOnline: true }
+            : contact
+        )
+      );
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, isOnline: true } : user
+        )
+      );
+    };
+
+    const handleUserOffline = (userId) => {
+      setContacts((prev) =>
+        prev.map((contact) =>
+          contact.id === userId
+            ? {
+                ...contact,
+                isOnline: false,
+                lastSeen: new Date().toISOString(),
+              }
+            : contact
+        )
+      );
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId
+            ? { ...user, isOnline: false, lastSeen: new Date().toISOString() }
+            : user
+        )
+      );
+    };
+
+    signalRService.on("UserOnline", handleUserOnline);
+    signalRService.on("UserOffline", handleUserOffline);
+
+    return () => {
+      signalRService.off("UserOnline", handleUserOnline);
+      signalRService.off("UserOffline", handleUserOffline);
+    };
+  }, []);
 
   const loadContacts = async () => {
     try {
