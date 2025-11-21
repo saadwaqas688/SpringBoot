@@ -7,6 +7,7 @@ using DotNetMessaging.API.DTOs;
 using DotNetMessaging.API.Models;
 using DotNetMessaging.API.Repositories;
 using DotNetMessaging.API.Hubs;
+using DotNetMessaging.API.Constants;
 using BCrypt.Net;
 
 namespace DotNetMessaging.API.Services;
@@ -70,7 +71,7 @@ public class AuthService : IAuthService
         await _userRepository.UpdateAsync(user.Id, user);
 
         // Notify all connected clients in real-time that this user is now online
-        await _hubContext.Clients.All.SendAsync("UserOnline", user.Id);
+        await _hubContext.Clients.All.SendAsync(SignalREvents.UserOnline, user.Id);
 
         var token = GenerateJwtToken(user);
         return new AuthResponse

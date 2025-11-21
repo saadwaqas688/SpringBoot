@@ -145,6 +145,35 @@ function ChatApp() {
       });
     });
 
+    // Handle group creation notification
+    signalRService.on("GroupCreated", (group) => {
+      console.log("GroupCreated event received:", group);
+      setGroups((prev) => {
+        // Check if group already exists (avoid duplicates)
+        const exists = prev.find((g) => g.id === group.id);
+        if (exists) return prev;
+        // Add new group to the beginning of the list
+        return [group, ...prev];
+      });
+    });
+
+    // Handle group member removal notification
+    signalRService.on("GroupMemberRemoved", async (groupId, removedUserId) => {
+      console.log("GroupMemberRemoved event received:", groupId, removedUserId);
+
+      // If the current user was removed, remove the group from their list
+      if (removedUserId === user?.id) {
+        setGroups((prev) => prev.filter((g) => g.id !== groupId));
+        // If the removed group was selected, clear selection
+        if (selectedGroup?.id === groupId) {
+          setSelectedGroup(null);
+        }
+      } else {
+        // If another member was removed, refresh the group list to get updated member list
+        refreshGroupList();
+      }
+    });
+
     return () => {
       window.removeEventListener("refreshChatList", refreshChatList);
       window.removeEventListener("refreshGroupList", refreshGroupList);
@@ -152,6 +181,8 @@ function ChatApp() {
       signalRService.off("NewGroupMessage");
       signalRService.off("UserOnline");
       signalRService.off("UserOffline");
+      signalRService.off("GroupCreated");
+      signalRService.off("GroupMemberRemoved");
     };
   }, [loading, user]);
 

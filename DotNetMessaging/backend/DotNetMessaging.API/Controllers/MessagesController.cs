@@ -5,6 +5,7 @@ using System.Security.Claims;
 using DotNetMessaging.API.DTOs;
 using DotNetMessaging.API.Services;
 using DotNetMessaging.API.Hubs;
+using DotNetMessaging.API.Constants;
 
 namespace DotNetMessaging.API.Controllers;
 
@@ -67,11 +68,13 @@ public class MessagesController : ControllerBase
             // Send via SignalR
             if (request.ChatId != null)
             {
-                await _hubContext.Clients.Group($"Chat_{request.ChatId}").SendAsync("NewMessage", message);
+                await _hubContext.Clients.Group(SignalREvents.GetChatGroupName(request.ChatId))
+                    .SendAsync(SignalREvents.NewMessage, message);
             }
             else if (request.GroupId != null)
             {
-                await _hubContext.Clients.Group($"Group_{request.GroupId}").SendAsync("NewGroupMessage", message);
+                await _hubContext.Clients.Group(SignalREvents.GetGroupChatName(request.GroupId))
+                    .SendAsync(SignalREvents.NewGroupMessage, message);
             }
 
             return Ok(message);
@@ -100,11 +103,13 @@ public class MessagesController : ControllerBase
             {
                 if (message.ChatId != null)
                 {
-                    await _hubContext.Clients.Group($"Chat_{message.ChatId}").SendAsync("MessageReactionUpdated", message);
+                    await _hubContext.Clients.Group(SignalREvents.GetChatGroupName(message.ChatId))
+                        .SendAsync(SignalREvents.MessageReactionUpdated, message);
                 }
                 else if (message.GroupId != null)
                 {
-                    await _hubContext.Clients.Group($"Group_{message.GroupId}").SendAsync("MessageReactionUpdated", message);
+                    await _hubContext.Clients.Group(SignalREvents.GetGroupChatName(message.GroupId))
+                        .SendAsync(SignalREvents.MessageReactionUpdated, message);
                 }
             }
             return Ok();
@@ -122,7 +127,7 @@ public class MessagesController : ControllerBase
         if (success)
         {
             // Notify via SignalR
-            await _hubContext.Clients.All.SendAsync("MessageDeleted", messageId);
+            await _hubContext.Clients.All.SendAsync(SignalREvents.MessageDeleted, messageId);
             return Ok();
         }
 

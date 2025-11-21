@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using DotNetMessaging.API.Services;
+using DotNetMessaging.API.Constants;
 
 namespace DotNetMessaging.API.Hubs;
 
@@ -21,7 +22,7 @@ public class ChatHub : Hub
         {
             _userConnections[userId] = Context.ConnectionId;
             await UpdateUserOnlineStatus(userId, true);
-            await Clients.All.SendAsync("UserOnline", userId);
+            await Clients.All.SendAsync(SignalREvents.UserOnline, userId);
         }
         await base.OnConnectedAsync();
     }
@@ -33,29 +34,29 @@ public class ChatHub : Hub
         {
             _userConnections.Remove(userId);
             await UpdateUserOnlineStatus(userId, false);
-            await Clients.All.SendAsync("UserOffline", userId);
+            await Clients.All.SendAsync(SignalREvents.UserOffline, userId);
         }
         await base.OnDisconnectedAsync(exception);
     }
 
     public async Task JoinChat(string chatId)
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"Chat_{chatId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, SignalREvents.GetChatGroupName(chatId));
     }
 
     public async Task LeaveChat(string chatId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Chat_{chatId}");
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, SignalREvents.GetChatGroupName(chatId));
     }
 
     public async Task JoinGroup(string groupId)
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"Group_{groupId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, SignalREvents.GetGroupChatName(groupId));
     }
 
     public async Task LeaveGroup(string groupId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Group_{groupId}");
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, SignalREvents.GetGroupChatName(groupId));
     }
 
     public async Task SendTyping(string chatId, bool isTyping)
@@ -64,7 +65,7 @@ public class ChatHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             // Ensure user is in the chat group before sending typing indicator
-            var groupName = $"Chat_{chatId}";
+            var groupName = SignalREvents.GetChatGroupName(chatId);
             await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
             
             var user = await _userService.GetUserByIdAsync(userId);
@@ -74,7 +75,7 @@ public class ChatHub : Hub
                 
                 // Send to all in the chat group except the sender
                 await Clients.GroupExcept(groupName, Context.ConnectionId)
-                    .SendAsync("UserTyping", chatId, userId, user.Username, isTyping);
+                    .SendAsync(SignalREvents.UserTyping, chatId, userId, user.Username, isTyping);
                 
                 Console.WriteLine($"[SendTyping] Event sent successfully");
             }
@@ -95,7 +96,7 @@ public class ChatHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             // Ensure user is in the group before sending typing indicator
-            var groupName = $"Group_{groupId}";
+            var groupName = SignalREvents.GetGroupChatName(groupId);
             await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
             
             var user = await _userService.GetUserByIdAsync(userId);
@@ -104,7 +105,7 @@ public class ChatHub : Hub
                 Console.WriteLine($"[SendGroupTyping] Sending typing indicator - GroupId: {groupId}, UserId: {userId}, Username: {user.Username}, IsTyping: {isTyping}, Group: {groupName}, ConnectionId: {Context.ConnectionId}");
                 
                 await Clients.GroupExcept(groupName, Context.ConnectionId)
-                    .SendAsync("UserTypingGroup", groupId, userId, user.Username, isTyping);
+                    .SendAsync(SignalREvents.UserTypingGroup, groupId, userId, user.Username, isTyping);
                 
                 Console.WriteLine($"[SendGroupTyping] Event sent successfully");
             }
