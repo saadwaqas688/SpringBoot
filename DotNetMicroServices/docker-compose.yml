@@ -1,0 +1,130 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI port
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  todoservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.todoservice.dev
+    container_name: todoservice
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./src/TodoService:/app/src/TodoService
+      - ./libs/Shared:/app/libs/Shared
+      - /app/src/TodoService/bin
+      - /app/src/TodoService/obj
+      - /app/libs/Shared/bin
+      - /app/libs/Shared/obj
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5001
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:5001/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  userservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.userservice.dev
+    container_name: userservice
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./src/UserService:/app/src/UserService
+      - ./libs/Shared:/app/libs/Shared
+      - /app/src/UserService/bin
+      - /app/src/UserService/obj
+      - /app/libs/Shared/bin
+      - /app/libs/Shared/obj
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5002
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:5002/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway.dev
+    container_name: gateway
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./src/Gateway:/app/src/Gateway
+      - ./libs/Shared:/app/libs/Shared
+      - /app/src/Gateway/bin
+      - /app/src/Gateway/obj
+      - /app/libs/Shared/bin
+      - /app/libs/Shared/obj
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ServiceUrls__TodoService=http://todoservice:5001
+      - ServiceUrls__UserService=http://userservice:5002
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      todoservice:
+        condition: service_healthy
+      userservice:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:5000/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  microservices-network:
+    driver: bridge

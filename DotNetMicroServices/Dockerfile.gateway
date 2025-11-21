@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /app
+EXPOSE 5000
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["src/Gateway/Gateway.csproj", "src/Gateway/"]
+COPY ["libs/Shared/Shared.csproj", "libs/Shared/"]
+RUN dotnet restore "src/Gateway/Gateway.csproj"
+COPY . .
+WORKDIR "/src/src/Gateway"
+RUN dotnet build "Gateway.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "Gateway.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "Gateway.dll"]
+
