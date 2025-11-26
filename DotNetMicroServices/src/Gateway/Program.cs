@@ -1,5 +1,9 @@
 using Gateway.Services;
 using Shared.Services;
+using Shared.Common;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +28,34 @@ builder.Services.AddSingleton<IRabbitMQService>(sp =>
 // Register Gateway services
 builder.Services.AddScoped<ITodoGatewayService, TodoGatewayService>();
 builder.Services.AddScoped<IUserGatewayService, UserGatewayService>();
+builder.Services.AddScoped<IUserAccountGatewayService, UserAccountGatewayService>();
+
+// JWT Authentication Configuration (same as UserAccountService)
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";
+var issuer = jwtSettings["Issuer"] ?? "UserAccountService";
+var audience = jwtSettings["Audience"] ?? "UserAccountService";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+    };
+});
+
+builder.Services.AddAuthorization();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -46,6 +78,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRouting();
 app.UseCors("AllowAll");
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Swagger configuration - after routing

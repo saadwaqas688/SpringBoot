@@ -29,6 +29,16 @@ public static class RabbitMQConstants
         public const string Update = "user.update";
         public const string Delete = "user.delete";
     }
+    
+    // Message Patterns - UserAccount Service
+    public static class UserAccount
+    {
+        public const string HealthCheck = "useraccount.health-check";
+        public const string SignUp = "useraccount.signup";
+        public const string SignIn = "useraccount.signin";
+        public const string UpdateProfile = "useraccount.update-profile";
+        public const string GetCurrentUser = "useraccount.get-current-user";
+    }
 }
 
 

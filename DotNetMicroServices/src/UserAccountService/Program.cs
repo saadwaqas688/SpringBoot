@@ -137,7 +137,8 @@ rabbitMQService.StartListening(RabbitMQConstants.UserAccountServiceQueue, async 
     // Create a scope for each message to resolve scoped services
     using var scope = app.Services.CreateScope();
     var messageHandler = scope.ServiceProvider.GetRequiredService<UserAccountMessageHandler>();
-    return await messageHandler.HandleMessage(messageJson, routingKey);
+    var result = await messageHandler.HandleMessage(messageJson, routingKey);
+    return result;
 });
 
 // Run the application
