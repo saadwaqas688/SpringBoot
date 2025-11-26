@@ -42,7 +42,9 @@ class SignalRService {
       this.connection.on(event, callback);
       console.log(`✅ Registered SignalR event handler: ${event}`);
     } else {
-      console.warn(`⚠️ Cannot register event handler ${event}: connection not available`);
+      console.warn(
+        `⚠️ Cannot register event handler ${event}: connection not available`
+      );
     }
   }
 
@@ -60,7 +62,10 @@ class SignalRService {
     ) {
       return this.connection.invoke(method, ...args);
     }
-    return Promise.reject(new Error("Connection not established"));
+    // Return a resolved promise instead of rejecting to prevent errors during cleanup
+    // This is especially important when components unmount during logout
+    console.warn(`⚠️ Cannot invoke ${method}: connection not established`);
+    return Promise.resolve();
   }
 
   getConnection() {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import signalRService from "../services/signalRService";
 import api from "../services/api";
@@ -17,6 +17,7 @@ function ChatApp() {
   const [groups, setGroups] = useState([]);
   const [showContacts, setShowContacts] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [activeTab, setActiveTab] = useState("chats");
 
   // Memoize the onChatUpdate callback to prevent unnecessary re-renders
   const handleChatUpdate = useCallback((updatedChat) => {
@@ -210,19 +211,27 @@ function ChatApp() {
           setGroups={setGroups}
           selectedChat={selectedChat}
           selectedGroup={selectedGroup}
-          onSelectChat={setSelectedChat}
-          onSelectGroup={setSelectedGroup}
+          onSelectChat={(chat) => {
+            setSelectedChat(chat);
+            setActiveTab("chats");
+          }}
+          onSelectGroup={(group) => {
+            setSelectedGroup(group);
+            setActiveTab("groups");
+          }}
           onShowContacts={() => setShowContacts(true)}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       </div>
       <div className="chat-main">
-        {selectedChat ? (
+        {activeTab === "chats" && selectedChat ? (
           <ChatWindow
             chat={selectedChat}
             onClose={() => setSelectedChat(null)}
             onChatUpdate={handleChatUpdate}
           />
-        ) : selectedGroup ? (
+        ) : activeTab === "groups" && selectedGroup ? (
           <GroupChatWindow
             group={selectedGroup}
             onClose={() => setSelectedGroup(null)}

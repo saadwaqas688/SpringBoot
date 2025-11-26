@@ -199,3 +199,23 @@
   color: #667781;
 }
 
+.typing-indicator-text {
+  font-style: italic;
+  color: #128c7e;
+  display: inline-block;
+}
+
+/* Animate the dots in typing indicator */
+.typing-indicator-text {
+  animation: typing-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes typing-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}

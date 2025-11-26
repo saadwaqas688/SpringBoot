@@ -5,6 +5,7 @@ public static class RabbitMQConstants
     // Queue Names
     public const string TodoServiceQueue = "TODO_SERVICE_QUEUE";
     public const string UserServiceQueue = "USER_SERVICE_QUEUE";
+    public const string UserAccountServiceQueue = "USER_ACCOUNT_SERVICE_QUEUE";
     
     // Message Patterns - Todo Service
     public static class Todo

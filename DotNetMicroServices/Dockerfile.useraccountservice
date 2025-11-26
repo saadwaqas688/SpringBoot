@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /app
+EXPOSE 5003
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["src/UserAccountService/UserAccountService.csproj", "src/UserAccountService/"]
+COPY ["libs/Shared/Shared.csproj", "libs/Shared/"]
+RUN dotnet restore "src/UserAccountService/UserAccountService.csproj"
+COPY . .
+WORKDIR "/src/src/UserAccountService"
+RUN dotnet build "UserAccountService.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "UserAccountService.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "UserAccountService.dll"]
+

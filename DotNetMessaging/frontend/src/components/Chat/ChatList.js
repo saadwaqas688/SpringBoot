@@ -14,10 +14,11 @@ function ChatList({
   onSelectChat,
   onSelectGroup,
   onShowContacts,
+  activeTab,
+  onTabChange,
 }) {
   const { user, loading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("chats");
 
   useEffect(() => {
     // Only load chats/groups after auth is ready and user is authenticated
@@ -45,7 +46,7 @@ function ChatList({
   const loadChats = async () => {
     // Don't load if auth is still loading or user is not authenticated
     if (loading || !user) return;
-    
+
     try {
       const response = await api.get("/chats");
       setChats(response.data);
@@ -57,7 +58,7 @@ function ChatList({
   const loadGroups = async () => {
     // Don't load if auth is still loading or user is not authenticated
     if (loading || !user) return;
-    
+
     try {
       const response = await api.get("/groups");
       setGroups(response.data);
@@ -113,13 +114,13 @@ function ChatList({
       <div className="chat-tabs">
         <button
           className={`tab ${activeTab === "chats" ? "active" : ""}`}
-          onClick={() => setActiveTab("chats")}
+          onClick={() => onTabChange("chats")}
         >
           Chats
         </button>
         <button
           className={`tab ${activeTab === "groups" ? "active" : ""}`}
-          onClick={() => setActiveTab("groups")}
+          onClick={() => onTabChange("groups")}
         >
           <FiUsers /> Groups
         </button>

@@ -1,4 +1,20 @@
 services:
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
@@ -85,6 +101,44 @@ services:
       retries: 5
       start_period: 30s
 
+  useraccountservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.useraccountservice.dev
+    container_name: useraccountservice
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./src/UserAccountService:/app/src/UserAccountService
+      - ./libs/Shared:/app/libs/Shared
+      - /app/src/UserAccountService/bin
+      - /app/src/UserAccountService/obj
+      - /app/libs/Shared/bin
+      - /app/libs/Shared/obj
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5003
+      - ConnectionStrings__DefaultConnection=mongodb://mongodb:27017
+      - MongoDb__DatabaseName=UserAccountDB
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:5003/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   gateway:
     build:
       context: .
@@ -104,6 +158,7 @@ services:
       - ASPNETCORE_URLS=http://+:5000
       - ServiceUrls__TodoService=http://todoservice:5001
       - ServiceUrls__UserService=http://userservice:5002
+      - ServiceUrls__UserAccountService=http://useraccountservice:5003
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__Port=5672
       - RabbitMQ__UserName=guest
@@ -115,6 +170,8 @@ services:
         condition: service_healthy
       userservice:
         condition: service_healthy
+      useraccountservice:
+        condition: service_healthy
     networks:
       - microservices-network
     healthcheck:
@@ -124,6 +181,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+volumes:
+  mongodb_data:
 
 networks:
   microservices-network:

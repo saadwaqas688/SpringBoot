@@ -26,6 +26,7 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     onChatUpdateRef.current = onChatUpdate;
   }, [onChatUpdate]);
 
+  console.log("currentChat", currentChat);
   useEffect(() => {
     setCurrentChat(chat);
     currentChatIdRef.current = chat?.id;
@@ -38,31 +39,34 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     setTypingUsers(new Set());
 
     loadMessages();
-    
+
     // Ensure SignalR is connected before joining chat
     const initializeChat = async () => {
       if (!signalRService.isConnected()) {
         console.log("Waiting for SignalR connection...");
         // Wait a bit for connection if not ready
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
-      
+
       if (signalRService.isConnected()) {
         await joinChat();
       } else {
         console.error("Cannot join chat: SignalR not connected");
       }
     };
-    
+
     initializeChat();
 
     const handleNewMessageWrapper = (message) => {
       if (message.chatId === currentChat.id) {
         setMessages((prev) => {
           // Check if message already exists to prevent duplicates
-          const messageExists = prev.some(m => m.id === message.id);
+          const messageExists = prev.some((m) => m.id === message.id);
           if (messageExists) {
-            console.log("[ChatWindow] Message already exists, skipping duplicate:", message.id);
+            console.log(
+              "[ChatWindow] Message already exists, skipping duplicate:",
+              message.id
+            );
             return prev;
           }
           return [...prev, message];
@@ -71,15 +75,15 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     };
 
     const handleUserTypingWrapper = (chatId, userId, userName, typing) => {
-      console.log("🔵 UserTyping event received:", { 
-        chatId, 
-        userId, 
-        userName, 
+      console.log("🔵 UserTyping event received:", {
+        chatId,
+        userId,
+        userName,
         typing,
         currentChatId: currentChatIdRef.current,
-        currentUserId: currentUser?.id
+        currentUserId: currentUser?.id,
       });
-      
+
       // Use ref to get current chat ID to avoid closure issues
       if (chatId === currentChatIdRef.current) {
         // Filter out current user - don't show "you are typing" to yourself
@@ -87,8 +91,12 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
           console.log("⚠️ Ignoring typing from current user");
           return;
         }
-        
-        console.log(`✅ Updating typing indicator: ${userName} is ${typing ? "typing" : "not typing"}`);
+
+        console.log(
+          `✅ Updating typing indicator: ${userName} is ${
+            typing ? "typing" : "not typing"
+          }`
+        );
         setTypingUsers((prev) => {
           const newSet = new Set(prev);
           const userKey = userName || userId;
@@ -101,7 +109,9 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
           return newSet;
         });
       } else {
-        console.log(`⚠️ Ignoring typing for different chat. Current: ${currentChatIdRef.current}, Received: ${chatId}`);
+        console.log(
+          `⚠️ Ignoring typing for different chat. Current: ${currentChatIdRef.current}, Received: ${chatId}`
+        );
       }
     };
 
@@ -158,10 +168,16 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     // Register event handlers AFTER ensuring connection is ready
     const registerHandlers = () => {
       if (signalRService.isConnected()) {
-        console.log("🔌 Registering SignalR event handlers for chat:", currentChatIdRef.current);
+        console.log(
+          "🔌 Registering SignalR event handlers for chat:",
+          currentChatIdRef.current
+        );
         signalRService.on("NewMessage", handleNewMessageWrapper);
         signalRService.on("UserTyping", handleUserTypingWrapper);
-        signalRService.on("MessageReactionUpdated", handleReactionUpdateWrapper);
+        signalRService.on(
+          "MessageReactionUpdated",
+          handleReactionUpdateWrapper
+        );
         signalRService.on("MessageDeleted", handleMessageDeletedWrapper);
         signalRService.on("UserOnline", handleUserOnlineWrapper);
         signalRService.on("UserOffline", handleUserOfflineWrapper);
@@ -177,7 +193,9 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     const connection = signalRService.getConnection();
     const handleConnectionStateChange = () => {
       if (connection?.state === signalR.HubConnectionState.Connected) {
-        console.log("🔌 Connection state changed to Connected, re-registering handlers");
+        console.log(
+          "🔌 Connection state changed to Connected, re-registering handlers"
+        );
         registerHandlers();
       }
     };
@@ -252,7 +270,7 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
           console.warn("SignalR not connected, cannot join chat");
           return;
         }
-        
+
         await signalRService.invoke("JoinChat", currentChat.id);
         console.log(`✅ Successfully joined chat group: ${currentChat.id}`);
       } catch (error) {
@@ -262,8 +280,13 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
   };
 
   const leaveChat = async () => {
-    if (currentChat?.id) {
-      await signalRService.invoke("LeaveChat", currentChat.id);
+    if (currentChat?.id && signalRService.isConnected()) {
+      try {
+        await signalRService.invoke("LeaveChat", currentChat.id);
+      } catch (error) {
+        // Silently fail during cleanup/logout
+        console.warn("Failed to leave chat during cleanup:", error);
+      }
     }
   };
 
@@ -280,14 +303,17 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
 
       // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
       setMessages((prev) => {
-        const messageExists = prev.some(m => m.id === response.data.id);
+        const messageExists = prev.some((m) => m.id === response.data.id);
         if (messageExists) {
-          console.log("[ChatWindow] Message already exists, skipping:", response.data.id);
+          console.log(
+            "[ChatWindow] Message already exists, skipping:",
+            response.data.id
+          );
           return prev;
         }
         return [...prev, response.data];
       });
-      
+
       setNewMessage("");
       setReplyingTo(null);
       stopTyping();
@@ -312,7 +338,8 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     if (!isTyping) {
       setIsTyping(true);
       console.log(`Sending typing indicator: true for chat ${chatId}`);
-      signalRService.invoke("SendTyping", chatId, true)
+      signalRService
+        .invoke("SendTyping", chatId, true)
         .then(() => console.log("Typing indicator sent successfully"))
         .catch((error) => {
           console.error("Failed to send typing indicator:", error);
@@ -327,7 +354,8 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
       console.log(`Sending typing indicator: false for chat ${chatId}`);
-      signalRService.invoke("SendTyping", chatId, false)
+      signalRService
+        .invoke("SendTyping", chatId, false)
         .then(() => console.log("Typing stop indicator sent successfully"))
         .catch((error) => {
           console.error("Failed to stop typing indicator:", error);
@@ -365,9 +393,12 @@ function ChatWindow({ chat, onClose, onChatUpdate }) {
 
       // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
       setMessages((prev) => {
-        const messageExists = prev.some(m => m.id === response.data.id);
+        const messageExists = prev.some((m) => m.id === response.data.id);
         if (messageExists) {
-          console.log("[ChatWindow] File message already exists, skipping:", response.data.id);
+          console.log(
+            "[ChatWindow] File message already exists, skipping:",
+            response.data.id
+          );
           return prev;
         }
         return [...prev, response.data];

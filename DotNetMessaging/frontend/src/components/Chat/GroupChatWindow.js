@@ -49,7 +49,7 @@ function GroupChatWindow({ group, onClose }) {
         userName,
         typing,
         currentGroupId: currentGroupIdRef.current,
-        currentUserId: user?.id
+        currentUserId: user?.id,
       });
 
       // Compare as strings to avoid type mismatch
@@ -62,8 +62,12 @@ function GroupChatWindow({ group, onClose }) {
           return;
         }
 
-        console.log(`✅ [GroupChatWindow] Updating typing indicator: ${userName} is ${typing ? "typing" : "not typing"}`);
-        
+        console.log(
+          `✅ [GroupChatWindow] Updating typing indicator: ${userName} is ${
+            typing ? "typing" : "not typing"
+          }`
+        );
+
         // Directly update state here instead of calling another function
         setTypingUsers((prev) => {
           const newSet = new Set(prev);
@@ -75,11 +79,18 @@ function GroupChatWindow({ group, onClose }) {
             newSet.delete(userKey);
             console.log("[GroupChatWindow] ❌ Removed typing user:", userKey);
           }
-          console.log("[GroupChatWindow] 📝 Typing users set:", Array.from(newSet), "Size:", newSet.size);
+          console.log(
+            "[GroupChatWindow] 📝 Typing users set:",
+            Array.from(newSet),
+            "Size:",
+            newSet.size
+          );
           return newSet;
         });
       } else {
-        console.log(`⚠️ [GroupChatWindow] Ignoring typing for different group. Current: "${currentGroupId}", Received: "${receivedGroupId}"`);
+        console.log(
+          `⚠️ [GroupChatWindow] Ignoring typing for different group. Current: "${currentGroupId}", Received: "${receivedGroupId}"`
+        );
       }
     };
     const handleReactionUpdateWrapper = (message) =>
@@ -89,30 +100,47 @@ function GroupChatWindow({ group, onClose }) {
 
     const registerHandlers = () => {
       if (signalRService.isConnected()) {
-        console.log("🔌 [GroupChatWindow] Registering SignalR event handlers for group:", currentGroupIdRef.current);
-        
+        console.log(
+          "🔌 [GroupChatWindow] Registering SignalR event handlers for group:",
+          currentGroupIdRef.current
+        );
+
         // Test if handler registration works by logging
         const testHandler = () => {
-          console.log("🧪 [GroupChatWindow] TEST: UserTypingGroup handler is active and receiving events!");
+          console.log(
+            "🧪 [GroupChatWindow] TEST: UserTypingGroup handler is active and receiving events!"
+          );
         };
-        
+
         signalRService.on("NewGroupMessage", handleNewMessageWrapper);
         signalRService.on("UserTypingGroup", handleUserTypingWrapper);
-        signalRService.on("MessageReactionUpdated", handleReactionUpdateWrapper);
+        signalRService.on(
+          "MessageReactionUpdated",
+          handleReactionUpdateWrapper
+        );
         signalRService.on("MessageDeleted", handleMessageDeletedWrapper);
-        
-        console.log("✅ [GroupChatWindow] All event handlers registered, including UserTypingGroup");
-        
+
+        console.log(
+          "✅ [GroupChatWindow] All event handlers registered, including UserTypingGroup"
+        );
+
         // Verify the connection has the handler
         const connection = signalRService.getConnection();
         if (connection) {
-          console.log("🔍 [GroupChatWindow] Verifying handler registration on connection...");
-          console.log("📡 [GroupChatWindow] SignalR connection state:", connection.state);
+          console.log(
+            "🔍 [GroupChatWindow] Verifying handler registration on connection..."
+          );
+          console.log(
+            "📡 [GroupChatWindow] SignalR connection state:",
+            connection.state
+          );
         }
-        
+
         return true;
       } else {
-        console.warn("⚠️ [GroupChatWindow] Cannot register handlers: SignalR not connected");
+        console.warn(
+          "⚠️ [GroupChatWindow] Cannot register handlers: SignalR not connected"
+        );
         return false;
       }
     };
@@ -120,7 +148,9 @@ function GroupChatWindow({ group, onClose }) {
     const connection = signalRService.getConnection();
     if (connection) {
       connection.onreconnected(() => {
-        console.log("[GroupChatWindow] SignalR reconnected, re-registering handlers");
+        console.log(
+          "[GroupChatWindow] SignalR reconnected, re-registering handlers"
+        );
         registerHandlers();
         joinGroup();
       });
@@ -130,20 +160,24 @@ function GroupChatWindow({ group, onClose }) {
     const initializeGroup = async () => {
       if (!signalRService.isConnected()) {
         console.log("⏳ [GroupChatWindow] Waiting for SignalR connection...");
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       if (signalRService.isConnected()) {
         console.log("✅ [GroupChatWindow] SignalR is connected");
-        
+
         // Register handlers first
         registerHandlers();
-        
+
         // Then join the group
-        console.log("🔄 [GroupChatWindow] Joining group after handler registration...");
+        console.log(
+          "🔄 [GroupChatWindow] Joining group after handler registration..."
+        );
         await joinGroup();
       } else {
-        console.error("❌ [GroupChatWindow] Cannot initialize: SignalR not connected");
+        console.error(
+          "❌ [GroupChatWindow] Cannot initialize: SignalR not connected"
+        );
       }
     };
 
@@ -171,7 +205,12 @@ function GroupChatWindow({ group, onClose }) {
   }, [messages]);
 
   useEffect(() => {
-    console.log("[GroupChatWindow] Typing users changed:", Array.from(typingUsers), "Size:", typingUsers.size);
+    console.log(
+      "[GroupChatWindow] Typing users changed:",
+      Array.from(typingUsers),
+      "Size:",
+      typingUsers.size
+    );
     if (typingUsers.size > 0) {
       scrollToBottom();
     }
@@ -197,18 +236,28 @@ function GroupChatWindow({ group, onClose }) {
     if (currentGroupIdRef.current) {
       try {
         if (!signalRService.isConnected()) {
-          console.warn("[GroupChatWindow] SignalR not connected, cannot join group");
+          console.warn(
+            "[GroupChatWindow] SignalR not connected, cannot join group"
+          );
           return;
         }
-        console.log(`🔄 [GroupChatWindow] Joining group: ${currentGroupIdRef.current}`);
+        console.log(
+          `🔄 [GroupChatWindow] Joining group: ${currentGroupIdRef.current}`
+        );
         await signalRService.invoke("JoinGroup", currentGroupIdRef.current);
-        console.log(`✅ [GroupChatWindow] Successfully joined group: ${currentGroupIdRef.current}`);
-        
+        console.log(
+          `✅ [GroupChatWindow] Successfully joined group: ${currentGroupIdRef.current}`
+        );
+
         // Verify group membership (this is async, but we log it)
         const connection = signalRService.getConnection();
         if (connection) {
-          console.log(`📋 [GroupChatWindow] Connection ID: ${connection.connectionId}`);
-          console.log(`📋 [GroupChatWindow] Should be in group: Group_${currentGroupIdRef.current}`);
+          console.log(
+            `📋 [GroupChatWindow] Connection ID: ${connection.connectionId}`
+          );
+          console.log(
+            `📋 [GroupChatWindow] Should be in group: Group_${currentGroupIdRef.current}`
+          );
         }
       } catch (error) {
         console.error("❌ [GroupChatWindow] Failed to join group:", error);
@@ -217,8 +266,13 @@ function GroupChatWindow({ group, onClose }) {
   };
 
   const leaveGroup = async () => {
-    if (group?.id) {
-      await signalRService.invoke("LeaveGroup", group.id);
+    if (group?.id && signalRService.isConnected()) {
+      try {
+        await signalRService.invoke("LeaveGroup", group.id);
+      } catch (error) {
+        // Silently fail during cleanup/logout
+        console.warn("Failed to leave group during cleanup:", error);
+      }
     }
   };
 
@@ -226,24 +280,36 @@ function GroupChatWindow({ group, onClose }) {
     if (message.groupId === group.id) {
       setMessages((prev) => {
         // Check if message already exists to prevent duplicates
-        const messageExists = prev.some(m => m.id === message.id);
+        const messageExists = prev.some((m) => m.id === message.id);
         if (messageExists) {
-          console.log("[GroupChatWindow] Message already exists, skipping duplicate:", message.id);
+          console.log(
+            "[GroupChatWindow] Message already exists, skipping duplicate:",
+            message.id
+          );
           return prev;
         }
-        console.log("[GroupChatWindow] Adding new message from SignalR:", message.id);
+        console.log(
+          "[GroupChatWindow] Adding new message from SignalR:",
+          message.id
+        );
         return [...prev, message];
       });
     }
   };
 
   const handleUserTyping = (groupId, userId, userName, typing) => {
-    console.log("[GroupChatWindow] handleUserTyping called:", { groupId, userId, userName, typing, currentGroupId: currentGroupIdRef.current });
-    
+    console.log("[GroupChatWindow] handleUserTyping called:", {
+      groupId,
+      userId,
+      userName,
+      typing,
+      currentGroupId: currentGroupIdRef.current,
+    });
+
     // Compare as strings to avoid type mismatch issues
     const currentGroupId = String(currentGroupIdRef.current);
     const receivedGroupId = String(groupId);
-    
+
     if (receivedGroupId === currentGroupId) {
       console.log("[GroupChatWindow] Group IDs match, updating typing users");
       setTypingUsers((prev) => {
@@ -256,32 +322,51 @@ function GroupChatWindow({ group, onClose }) {
           newSet.delete(userKey);
           console.log("[GroupChatWindow] Removed typing user:", userKey);
         }
-        console.log("[GroupChatWindow] Typing users set:", Array.from(newSet), "Size:", newSet.size);
+        console.log(
+          "[GroupChatWindow] Typing users set:",
+          Array.from(newSet),
+          "Size:",
+          newSet.size
+        );
         return newSet;
       });
     } else {
-      console.log(`[GroupChatWindow] Group IDs don't match. Current: "${currentGroupId}", Received: "${receivedGroupId}"`);
+      console.log(
+        `[GroupChatWindow] Group IDs don't match. Current: "${currentGroupId}", Received: "${receivedGroupId}"`
+      );
     }
   };
 
   const handleTyping = () => {
     const groupId = currentGroupIdRef.current;
     if (!groupId) {
-      console.warn("[GroupChatWindow] Cannot send typing indicator: no group ID");
+      console.warn(
+        "[GroupChatWindow] Cannot send typing indicator: no group ID"
+      );
       return;
     }
     if (!signalRService.isConnected()) {
-      console.warn("[GroupChatWindow] Cannot send typing indicator: SignalR not connected");
+      console.warn(
+        "[GroupChatWindow] Cannot send typing indicator: SignalR not connected"
+      );
       return;
     }
 
     if (!isTyping) {
       setIsTyping(true);
-      console.log(`[GroupChatWindow] Sending typing indicator: true for group ${groupId}`);
-      signalRService.invoke("SendGroupTyping", groupId, true)
-        .then(() => console.log("[GroupChatWindow] Typing indicator sent successfully"))
+      console.log(
+        `[GroupChatWindow] Sending typing indicator: true for group ${groupId}`
+      );
+      signalRService
+        .invoke("SendGroupTyping", groupId, true)
+        .then(() =>
+          console.log("[GroupChatWindow] Typing indicator sent successfully")
+        )
         .catch((error) => {
-          console.error("[GroupChatWindow] Failed to send typing indicator:", error);
+          console.error(
+            "[GroupChatWindow] Failed to send typing indicator:",
+            error
+          );
         });
     }
 
@@ -291,11 +376,21 @@ function GroupChatWindow({ group, onClose }) {
 
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      console.log(`[GroupChatWindow] Sending typing indicator: false for group ${groupId}`);
-      signalRService.invoke("SendGroupTyping", groupId, false)
-        .then(() => console.log("[GroupChatWindow] Typing stop indicator sent successfully"))
+      console.log(
+        `[GroupChatWindow] Sending typing indicator: false for group ${groupId}`
+      );
+      signalRService
+        .invoke("SendGroupTyping", groupId, false)
+        .then(() =>
+          console.log(
+            "[GroupChatWindow] Typing stop indicator sent successfully"
+          )
+        )
         .catch((error) => {
-          console.error("[GroupChatWindow] Failed to stop typing indicator:", error);
+          console.error(
+            "[GroupChatWindow] Failed to stop typing indicator:",
+            error
+          );
         });
     }, 3000);
   };
@@ -306,9 +401,14 @@ function GroupChatWindow({ group, onClose }) {
 
     if (isTyping) {
       setIsTyping(false);
-      signalRService.invoke("SendGroupTyping", groupId, false).catch((error) => {
-        console.error("[GroupChatWindow] Failed to stop typing indicator:", error);
-      });
+      signalRService
+        .invoke("SendGroupTyping", groupId, false)
+        .catch((error) => {
+          console.error(
+            "[GroupChatWindow] Failed to stop typing indicator:",
+            error
+          );
+        });
     }
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -342,14 +442,17 @@ function GroupChatWindow({ group, onClose }) {
 
       // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
       setMessages((prev) => {
-        const messageExists = prev.some(m => m.id === response.data.id);
+        const messageExists = prev.some((m) => m.id === response.data.id);
         if (messageExists) {
-          console.log("[GroupChatWindow] Message already exists, skipping:", response.data.id);
+          console.log(
+            "[GroupChatWindow] Message already exists, skipping:",
+            response.data.id
+          );
           return prev;
         }
         return [...prev, response.data];
       });
-      
+
       setNewMessage("");
       setReplyingTo(null);
     } catch (error) {
@@ -372,9 +475,12 @@ function GroupChatWindow({ group, onClose }) {
 
       // Add message optimistically - SignalR will also broadcast it, but we check for duplicates
       setMessages((prev) => {
-        const messageExists = prev.some(m => m.id === response.data.id);
+        const messageExists = prev.some((m) => m.id === response.data.id);
         if (messageExists) {
-          console.log("[GroupChatWindow] File message already exists, skipping:", response.data.id);
+          console.log(
+            "[GroupChatWindow] File message already exists, skipping:",
+            response.data.id
+          );
           return prev;
         }
         return [...prev, response.data];
@@ -545,11 +651,24 @@ function GroupChatWindow({ group, onClose }) {
           />
         ))}
         {typingUsers.size > 0 && (
-          <div className="typing-indicator" style={{ padding: "0.5rem 1rem", fontStyle: "italic", color: "#667781", backgroundColor: "#f0f2f5", borderRadius: "8px", margin: "0.5rem 0" }}>
+          <div
+            className="typing-indicator"
+            style={{
+              padding: "0.5rem 1rem",
+              fontStyle: "italic",
+              color: "#667781",
+              backgroundColor: "#f0f2f5",
+              borderRadius: "8px",
+              margin: "0.5rem 0",
+            }}
+          >
             {Array.from(typingUsers).length === 1 ? (
               <span>{Array.from(typingUsers)[0]} is typing...</span>
             ) : (
-              <span>{Array.from(typingUsers).slice(0, -1).join(", ")} and {Array.from(typingUsers).slice(-1)[0]} are typing...</span>
+              <span>
+                {Array.from(typingUsers).slice(0, -1).join(", ")} and{" "}
+                {Array.from(typingUsers).slice(-1)[0]} are typing...
+              </span>
             )}
           </div>
         )}

@@ -1,0 +1,145 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
+using System.Text;
+using UserAccountService.Data;
+using UserAccountService.Models;
+using UserAccountService.Services;
+using Shared.Services;
+using Shared.Constants;
+using Swashbuckle.AspNetCore.SwaggerGen;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// MongoDB Configuration
+var mongoConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? "mongodb://localhost:27017";
+var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "UserAccountDB";
+
+builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
+builder.Services.AddScoped<MongoDbContext>(sp =>
+{
+    var mongoClient = sp.GetRequiredService<IMongoClient>();
+    return new MongoDbContext(mongoClient, mongoDatabaseName);
+});
+
+// Register services
+builder.Services.AddScoped<IUserAccountService, UserAccountService.Services.UserAccountService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<UserAccountMessageHandler>();
+
+// JWT Authentication Configuration
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";
+var issuer = jwtSettings["Issuer"] ?? "UserAccountService";
+var audience = jwtSettings["Audience"] ?? "UserAccountService";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// Register RabbitMQ Service
+var rabbitMQConfig = builder.Configuration.GetSection("RabbitMQ");
+builder.Services.AddSingleton<IRabbitMQService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<RabbitMQService>>();
+    return new RabbitMQService(
+        rabbitMQConfig["HostName"] ?? "localhost",
+        int.Parse(rabbitMQConfig["Port"] ?? "5672"),
+        rabbitMQConfig["UserName"] ?? "guest",
+        rabbitMQConfig["Password"] ?? "guest",
+        logger);
+});
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+var app = builder.Build();
+
+// Ensure database indexes are created and seed admin user
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
+    var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+    
+    // Create indexes
+    await context.CreateIndexesAsync();
+    
+    // Seed admin user if it doesn't exist
+    var adminEmail = "admin@example.com";
+    var filter = Builders<UserAccount>.Filter.Eq(u => u.Email, adminEmail.ToLower());
+    var adminExists = await context.UserAccounts.Find(filter).AnyAsync();
+    
+    if (!adminExists)
+    {
+        var adminUser = new UserAccount
+        {
+            Id = Guid.NewGuid(),
+            Name = "Admin User",
+            Email = adminEmail.ToLower(),
+            PasswordHash = authService.HashPassword("Admin@123"), // Default admin password
+            Role = "admin",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        await context.UserAccounts.InsertOneAsync(adminUser);
+    }
+}
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseCors("AllowAll");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+// Start RabbitMQ listener
+var rabbitMQService = app.Services.GetRequiredService<IRabbitMQService>();
+
+rabbitMQService.StartListening(RabbitMQConstants.UserAccountServiceQueue, async (messageJson, routingKey) =>
+{
+    // Create a scope for each message to resolve scoped services
+    using var scope = app.Services.CreateScope();
+    var messageHandler = scope.ServiceProvider.GetRequiredService<UserAccountMessageHandler>();
+    return await messageHandler.HandleMessage(messageJson, routingKey);
+});
+
+// Run the application
+app.Run();
+

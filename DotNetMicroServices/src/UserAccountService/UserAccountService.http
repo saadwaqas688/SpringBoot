@@ -1,0 +1,43 @@
+### Sign Up
+POST http://localhost:5003/api/auth/signup
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "password": "Password123!",
+  "image": "https://example.com/profile.jpg"
+}
+
+### Sign In
+POST http://localhost:5003/api/auth/signin
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "Password123!"
+}
+
+### Sign In as Admin
+POST http://localhost:5003/api/auth/signin
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin@123"
+}
+
+### Get Current User (Requires Authentication)
+GET http://localhost:5003/api/auth/me
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+### Update Profile (Requires Authentication)
+PUT http://localhost:5003/api/auth/profile
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "John Updated",
+  "image": "https://example.com/new-profile.jpg"
+}
+
