@@ -87,5 +87,56 @@ public class UserAccountGatewayService : IUserAccountGatewayService
             return ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while retrieving user");
         }
     }
+
+    public async Task<ApiResponse<AuthResponseDto>> RefreshTokenAsync(RefreshTokenDto dto)
+    {
+        try
+        {
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<AuthResponseDto>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.RefreshToken,
+                dto);
+            return response ?? ApiResponse<AuthResponseDto>.ErrorResponse("Failed to refresh token");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService for refresh token");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during token refresh");
+        }
+    }
+
+    public async Task<ApiResponse<string>> ForgotPasswordAsync(ForgotPasswordDto dto)
+    {
+        try
+        {
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<string>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.ForgotPassword,
+                dto);
+            return response ?? ApiResponse<string>.ErrorResponse("Failed to process forgot password");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService for forgot password");
+            return ApiResponse<string>.ErrorResponse("An error occurred during forgot password");
+        }
+    }
+
+    public async Task<ApiResponse<string>> ResetPasswordAsync(ResetPasswordDto dto)
+    {
+        try
+        {
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<string>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.ResetPassword,
+                dto);
+            return response ?? ApiResponse<string>.ErrorResponse("Failed to reset password");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService for reset password");
+            return ApiResponse<string>.ErrorResponse("An error occurred during password reset");
+        }
+    }
 }
 

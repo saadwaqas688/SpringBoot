@@ -4,12 +4,17 @@ WORKDIR /app
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
+# Copy project files for restore
+COPY ["libs/Shared/Shared.csproj", "libs/Shared/"]
+COPY ["src/Gateway/Gateway.csproj", "src/Gateway/"]
+
+# Restore dependencies
+WORKDIR /app/src/Gateway
+RUN dotnet restore
+
 # Expose port
 EXPOSE 5000
 
-# Set working directory
-WORKDIR /app/src/Gateway
-
-# Restore packages and run with watch (will restore on first run)
-CMD sh -c "dotnet restore && dotnet watch run --urls http://+:5000"
+# Run with watch (source code will be mounted as volume)
+CMD ["dotnet", "watch", "run", "--urls", "http://+:5000"]
 

@@ -13,6 +13,12 @@ public class RabbitMQService : IRabbitMQService, IDisposable
     private readonly ILogger<RabbitMQService> _logger;
     private readonly string _exchangeName = "microservices_exchange";
     private bool _disposed = false;
+    private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false
+    };
 
     public RabbitMQService(string hostName, int port, string userName, string password, ILogger<RabbitMQService> logger)
     {
@@ -84,10 +90,7 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                     
                     try
                     {
-                        var response = JsonSerializer.Deserialize<T>(responseJson, new JsonSerializerOptions
-                        {
-                            PropertyNameCaseInsensitive = true
-                        });
+                        var response = JsonSerializer.Deserialize<T>(responseJson, _jsonOptions);
                         tcs.SetResult(response);
                     }
                     catch (Exception ex)
@@ -101,7 +104,7 @@ public class RabbitMQService : IRabbitMQService, IDisposable
             _channel.BasicConsume(queue: replyQueueName, autoAck: true, consumer: consumer);
 
             // Serialize and send message
-            var messageJson = JsonSerializer.Serialize(message);
+            var messageJson = JsonSerializer.Serialize(message, _jsonOptions);
             var messageBody = Encoding.UTF8.GetBytes(messageJson);
 
             var properties = _channel.CreateBasicProperties();
@@ -145,9 +148,19 @@ public class RabbitMQService : IRabbitMQService, IDisposable
             
             // Determine routing key pattern based on queue name
             string routingKeyPattern;
-            if (queueName.Contains("TODO", StringComparison.OrdinalIgnoreCase))
+            if (queueName.Contains("USER_ACCOUNT", StringComparison.OrdinalIgnoreCase))
             {
-                routingKeyPattern = "todo.*";
+                routingKeyPattern = "useraccount.*";
+            }
+            else if (queueName.Contains("COURSES", StringComparison.OrdinalIgnoreCase))
+            {
+                // Bind to all course-related routing keys with multiple patterns
+                var patterns = new[] { "courses.*", "lessons.*", "slides.*", "posts.*", "quizzes.*", "quiz-questions.*", "quiz-attempts.*", "progress.*", "activity.*", "users.*", "admin.*" };
+                foreach (var pattern in patterns)
+                {
+                    _channel.QueueBind(queue: queueName, exchange: _exchangeName, routingKey: pattern);
+                }
+                routingKeyPattern = "courses.*"; // Default for logging
             }
             else if (queueName.Contains("USER", StringComparison.OrdinalIgnoreCase))
             {
@@ -158,8 +171,11 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                 routingKeyPattern = $"{queueName.ToLower()}.*";
             }
             
-            // Bind queue to exchange with routing key pattern
-            _channel.QueueBind(queue: queueName, exchange: _exchangeName, routingKey: routingKeyPattern);
+            // Bind queue to exchange with routing key pattern (if not already bound for CoursesService)
+            if (!queueName.Contains("COURSES", StringComparison.OrdinalIgnoreCase))
+            {
+                _channel.QueueBind(queue: queueName, exchange: _exchangeName, routingKey: routingKeyPattern);
+            }
 
             var consumer = new EventingBasicConsumer(_channel);
             
@@ -179,7 +195,7 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                     
                     if (response != null && !string.IsNullOrEmpty(ea.BasicProperties.ReplyTo))
                     {
-                        var responseJson = JsonSerializer.Serialize(response);
+                        var responseJson = JsonSerializer.Serialize(response, _jsonOptions);
                         var responseBody = Encoding.UTF8.GetBytes(responseJson);
                         
                         _channel.BasicPublish(
@@ -204,7 +220,7 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                             Message = "Error processing message",
                             Errors = new[] { ex.Message }
                         };
-                        var errorJson = JsonSerializer.Serialize(errorResponse);
+                        var errorJson = JsonSerializer.Serialize(errorResponse, _jsonOptions);
                         var errorBody = Encoding.UTF8.GetBytes(errorJson);
                         
                         _channel.BasicPublish(

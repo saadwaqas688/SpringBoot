@@ -9,5 +9,8 @@ public interface IUserAccountGatewayService
     Task<ApiResponse<AuthResponseDto>> SignInAsync(SignInDto dto);
     Task<ApiResponse<UserInfoDto>> UpdateProfileAsync(string token, UpdateProfileDto dto);
     Task<ApiResponse<UserInfoDto>> GetCurrentUserAsync(string token);
+    Task<ApiResponse<AuthResponseDto>> RefreshTokenAsync(RefreshTokenDto dto);
+    Task<ApiResponse<string>> ForgotPasswordAsync(ForgotPasswordDto dto);
+    Task<ApiResponse<string>> ResetPasswordAsync(ResetPasswordDto dto);
 }
 

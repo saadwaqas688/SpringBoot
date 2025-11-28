@@ -197,5 +197,101 @@ public class AuthController : ControllerBase
             return StatusCode(500, ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while retrieving user"));
         }
     }
+
+    [HttpPost("refresh-token")]
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> RefreshToken([FromBody] RefreshTokenDto dto)
+    {
+        try
+        {
+            // For now, we'll validate the token and generate a new one
+            // In production, you'd validate the refresh token from a token store
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid token"));
+            }
+
+            var user = await _userAccountService.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(ApiResponse<AuthResponseDto>.ErrorResponse("User not found"));
+            }
+
+            var token = _authService.GenerateJwtToken(user);
+            var response = new AuthResponseDto
+            {
+                Token = token,
+                User = new UserInfoDto
+                {
+                    Id = user.Id,
+                    Name = user.Name,
+                    Email = user.Email,
+                    Image = user.Image,
+                    Role = user.Role
+                }
+            };
+
+            return Ok(ApiResponse<AuthResponseDto>.SuccessResponse(response, "Token refreshed successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token");
+            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred while refreshing token"));
+        }
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<ApiResponse<string>>> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        try
+        {
+            var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                // Don't reveal if user exists for security
+                return Ok(ApiResponse<string>.SuccessResponse("If the email exists, a password reset link has been sent", "Password reset email sent"));
+            }
+
+            // In production, generate a reset token and send email
+            // For now, just return success
+            return Ok(ApiResponse<string>.SuccessResponse("If the email exists, a password reset link has been sent", "Password reset email sent"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing forgot password");
+            return StatusCode(500, ApiResponse<string>.ErrorResponse("An error occurred while processing request"));
+        }
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<ApiResponse<string>>> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        try
+        {
+            var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResponse("Invalid reset token or email"));
+            }
+
+            // In production, validate the reset token
+            // For now, just update the password
+            user.PasswordHash = _authService.HashPassword(dto.NewPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var updated = await _userAccountService.UpdateUserAsync(user.Id, user, null);
+            if (updated == null)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResponse("Failed to reset password"));
+            }
+
+            return Ok(ApiResponse<string>.SuccessResponse("Password reset successfully", "Password has been reset"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password");
+            return StatusCode(500, ApiResponse<string>.ErrorResponse("An error occurred while resetting password"));
+        }
+    }
 }
 

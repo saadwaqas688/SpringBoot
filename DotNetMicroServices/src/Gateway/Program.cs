@@ -25,10 +25,12 @@ builder.Services.AddSingleton<IRabbitMQService>(sp =>
         logger);
 });
 
+// Register HttpClient for direct HTTP calls (for file uploads)
+builder.Services.AddHttpClient();
+
 // Register Gateway services
-builder.Services.AddScoped<ITodoGatewayService, TodoGatewayService>();
-builder.Services.AddScoped<IUserGatewayService, UserGatewayService>();
 builder.Services.AddScoped<IUserAccountGatewayService, UserAccountGatewayService>();
+builder.Services.AddScoped<ICoursesGatewayService, CoursesGatewayService>();
 
 // JWT Authentication Configuration (same as UserAccountService)
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

@@ -11,13 +11,16 @@ namespace Gateway.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IUserAccountGatewayService _userAccountGatewayService;
+    private readonly ICoursesGatewayService _coursesGatewayService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IUserAccountGatewayService userAccountGatewayService,
+        ICoursesGatewayService coursesGatewayService,
         ILogger<AuthController> logger)
     {
         _userAccountGatewayService = userAccountGatewayService;
+        _coursesGatewayService = coursesGatewayService;
         _logger = logger;
     }
 
@@ -61,6 +64,38 @@ public class AuthController : ControllerBase
 
         var response = await _userAccountGatewayService.GetCurrentUserAsync(token);
         return StatusCode(response.Success ? 200 : 401, response);
+    }
+
+    [HttpPost("refresh-token")]
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> RefreshToken([FromBody] RefreshTokenDto dto)
+    {
+        var response = await _userAccountGatewayService.RefreshTokenAsync(dto);
+        return StatusCode(response.Success ? 200 : 401, response);
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<ApiResponse<string>>> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        var response = await _userAccountGatewayService.ForgotPasswordAsync(dto);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<ApiResponse<string>>> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        var response = await _userAccountGatewayService.ResetPasswordAsync(dto);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+
+    [Authorize(Roles = "admin")]
+    [HttpGet("users")]
+    public async Task<ActionResult<ApiResponse<PagedResponse<object>>>> GetAllUsers(
+        [FromQuery] int page = 1, 
+        [FromQuery] int pageSize = 10, 
+        [FromQuery] string? search = null)
+    {
+        var response = await _coursesGatewayService.GetAllUsersAsync(page, pageSize, search);
+        return StatusCode(response.Success ? 200 : 500, response);
     }
 }
 

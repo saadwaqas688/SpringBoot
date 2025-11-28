@@ -4,7 +4,6 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Gateway/Gateway.csproj" />
-    <Project Path="src/TodoService/TodoService.csproj" />
     <Project Path="src/UserService/UserService.csproj" />
   </Folder>
 </Solution>

@@ -42,6 +42,9 @@ public class UserAccountMessageHandler
                 RabbitMQConstants.UserAccount.SignIn => await HandleSignIn(messageJson),
                 RabbitMQConstants.UserAccount.UpdateProfile => await HandleUpdateProfile(messageJson),
                 RabbitMQConstants.UserAccount.GetCurrentUser => await HandleGetCurrentUser(messageJson),
+                RabbitMQConstants.UserAccount.RefreshToken => await HandleRefreshToken(messageJson),
+                RabbitMQConstants.UserAccount.ForgotPassword => await HandleForgotPassword(messageJson),
+                RabbitMQConstants.UserAccount.ResetPassword => await HandleResetPassword(messageJson),
                 _ => ApiResponse<object>.ErrorResponse($"Unknown routing key: {routingKey}")
             };
         }
@@ -281,5 +284,106 @@ public class UserAccountMessageHandler
     private class GetCurrentUserRequest
     {
         public string? Token { get; set; }
+    }
+
+    private async Task<object> HandleRefreshToken(string messageJson)
+    {
+        try
+        {
+            var dto = JsonSerializer.Deserialize<RefreshTokenDto>(messageJson, _jsonOptions);
+            if (dto == null)
+            {
+                return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid refresh token data");
+            }
+
+            var userId = ExtractUserIdFromToken(dto.Token);
+            if (userId == null)
+            {
+                return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid token");
+            }
+
+            var user = await _userAccountService.GetUserByIdAsync(userId.Value);
+            if (user == null)
+            {
+                return ApiResponse<AuthResponseDto>.ErrorResponse("User not found");
+            }
+
+            var token = _authService.GenerateJwtToken(user);
+            var response = new AuthResponseDto
+            {
+                Token = token,
+                User = new UserInfoDto
+                {
+                    Id = user.Id,
+                    Name = user.Name,
+                    Email = user.Email,
+                    Image = user.Image,
+                    Role = user.Role
+                }
+            };
+
+            return ApiResponse<AuthResponseDto>.SuccessResponse(response, "Token refreshed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleRefreshToken");
+            return ApiResponse<AuthResponseDto>.ErrorResponse($"Error refreshing token: {ex.Message}");
+        }
+    }
+
+    private async Task<object> HandleForgotPassword(string messageJson)
+    {
+        try
+        {
+            var dto = JsonSerializer.Deserialize<ForgotPasswordDto>(messageJson, _jsonOptions);
+            if (dto == null)
+            {
+                return ApiResponse<string>.ErrorResponse("Invalid forgot password data");
+            }
+
+            var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            // Don't reveal if user exists for security
+            return ApiResponse<string>.SuccessResponse("If the email exists, a password reset link has been sent", "Password reset email sent");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleForgotPassword");
+            return ApiResponse<string>.ErrorResponse($"Error processing forgot password: {ex.Message}");
+        }
+    }
+
+    private async Task<object> HandleResetPassword(string messageJson)
+    {
+        try
+        {
+            var dto = JsonSerializer.Deserialize<ResetPasswordDto>(messageJson, _jsonOptions);
+            if (dto == null)
+            {
+                return ApiResponse<string>.ErrorResponse("Invalid reset password data");
+            }
+
+            var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            if (user == null)
+            {
+                return ApiResponse<string>.ErrorResponse("Invalid reset token or email");
+            }
+
+            // In production, validate the reset token
+            user.PasswordHash = _authService.HashPassword(dto.NewPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var updated = await _userAccountService.UpdateUserAsync(user.Id, user, null);
+            if (updated == null)
+            {
+                return ApiResponse<string>.ErrorResponse("Failed to reset password");
+            }
+
+            return ApiResponse<string>.SuccessResponse("Password reset successfully", "Password has been reset");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleResetPassword");
+            return ApiResponse<string>.ErrorResponse($"Error resetting password: {ex.Message}");
+        }
     }
 }

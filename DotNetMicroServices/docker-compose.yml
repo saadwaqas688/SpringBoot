@@ -33,40 +33,6 @@ services:
       retries: 5
       start_period: 30s
 
-  todoservice:
-    build:
-      context: .
-      dockerfile: Dockerfile.todoservice.dev
-    container_name: todoservice
-    ports:
-      - "5001:5001"
-    volumes:
-      - ./src/TodoService:/app/src/TodoService
-      - ./libs/Shared:/app/libs/Shared
-      - /app/src/TodoService/bin
-      - /app/src/TodoService/obj
-      - /app/libs/Shared/bin
-      - /app/libs/Shared/obj
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:5001
-      - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__Port=5672
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - microservices-network
-    healthcheck:
-      test:
-        ["CMD", "curl", "-f", "http://localhost:5001/swagger/v1/swagger.json"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   userservice:
     build:
       context: .
@@ -139,6 +105,44 @@ services:
       retries: 5
       start_period: 30s
 
+  coursesservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.coursesservice.dev
+    container_name: coursesservice
+    ports:
+      - "5004:5004"
+    volumes:
+      - ./src/CoursesService:/app/src/CoursesService
+      - ./libs/Shared:/app/libs/Shared
+      - /app/src/CoursesService/bin
+      - /app/src/CoursesService/obj
+      - /app/libs/Shared/bin
+      - /app/libs/Shared/obj
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5004
+      - ConnectionStrings__DefaultConnection=mongodb://mongodb:27017
+      - MongoDb__DatabaseName=CoursesDB
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:5004/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   gateway:
     build:
       context: .
@@ -156,9 +160,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
-      - ServiceUrls__TodoService=http://todoservice:5001
       - ServiceUrls__UserService=http://userservice:5002
       - ServiceUrls__UserAccountService=http://useraccountservice:5003
+      - ServiceUrls__CoursesService=http://coursesservice:5004
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__Port=5672
       - RabbitMQ__UserName=guest
@@ -166,11 +170,11 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      todoservice:
-        condition: service_healthy
       userservice:
         condition: service_healthy
       useraccountservice:
+        condition: service_healthy
+      coursesservice:
         condition: service_healthy
     networks:
       - microservices-network
