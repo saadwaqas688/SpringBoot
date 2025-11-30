@@ -135,6 +135,12 @@ public class SlidesController : ControllerBase
                 slide.Title = "Untitled Slide";
             }
 
+            // Set default type if not provided
+            if (string.IsNullOrWhiteSpace(slide.Type))
+            {
+                slide.Type = "bulleted-list";
+            }
+
             // Ensure content is properly initialized with new structure
             if (slide.Content == null)
             {
@@ -176,6 +182,22 @@ public class SlidesController : ControllerBase
         try
         {
             slide.Id = id;
+
+            // Get existing slide to preserve type if not provided
+            var existingSlide = await _slideRepository.GetByIdAsync(id);
+            if (existingSlide != null)
+            {
+                // Preserve existing type if not provided in update
+                if (string.IsNullOrWhiteSpace(slide.Type))
+                {
+                    slide.Type = existingSlide.Type ?? "bulleted-list";
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(slide.Type))
+            {
+                // Only default if slide doesn't exist (shouldn't happen in update)
+                slide.Type = "bulleted-list";
+            }
 
             // Ensure content is properly initialized with new structure
             if (slide.Content == null)

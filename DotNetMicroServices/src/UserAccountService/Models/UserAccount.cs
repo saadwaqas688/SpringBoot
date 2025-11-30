@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace UserAccountService.Models;
@@ -6,7 +7,8 @@ namespace UserAccountService.Models;
 public class UserAccount
 {
     [BsonId]
-    public Guid Id { get; set; }
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? Id { get; set; }
     [BsonElement("name")]
     public string Name { get; set; } = string.Empty;
     [BsonElement("email")]

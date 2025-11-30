@@ -14,7 +14,7 @@ public class StandardSlide
     public string LessonId { get; set; } = string.Empty;
 
     [BsonElement("type")]
-    public string Type { get; set; } = "text"; // "video" | "image" | "text"
+    public string Type { get; set; } = "bulleted-list"; // "bulleted-list" | "expandable-list" | "single-image" | "image-collection" | "single-video" | "video-collection"
 
     [BsonElement("content")]
     public SlideContent Content { get; set; } = new();

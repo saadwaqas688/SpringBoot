@@ -63,10 +63,10 @@ export const coursesAPI = baseAPI.injectEndpoints({
       providesTags: [COURSES],
     }),
     assignUser: builder.mutation({
-      query: (body) => ({
-        url: API_ENDPOINTS.COURSES.ASSIGN_USER,
+      query: ({ courseId, userIds }) => ({
+        url: `${API_ENDPOINTS.COURSES.GET_BY_ID(courseId)}/assign-user`,
         method: "POST",
-        body,
+        body: { userIds },
       }),
       invalidatesTags: [COURSES],
     }),
@@ -93,6 +93,14 @@ export const coursesAPI = baseAPI.injectEndpoints({
       }),
       providesTags: [COURSES],
     }),
+    getUserCourses: builder.query({
+      query: ({ userId, page = 1, pageSize = 10 }) => ({
+        url: API_ENDPOINTS.COURSES.GET_USER_COURSES(userId),
+        method: "GET",
+        params: { page, pageSize },
+      }),
+      providesTags: [COURSES],
+    }),
   }),
 });
 
@@ -108,5 +116,6 @@ export const {
   useRemoveUserMutation,
   useGetAssignedUsersQuery,
   useGetUserProgressQuery,
+  useGetUserCoursesQuery,
 } = coursesAPI;
 

@@ -148,13 +148,28 @@ export default function SignInPage() {
     try {
       const result = await signIn(data).unwrap();
       if (result.success && result.data) {
+        const token = result.data.token || result.data.accessToken || result.data.Token;
+        const user = result.data.user || result.data.User;
+
+        // Store in Redux (which will persist to localStorage via redux-persist)
         dispatch(
           setCredentials({
-            accessToken: result.data.token || result.data.accessToken,
+            accessToken: token,
             refreshToken: result.data.refreshToken,
-            user: result.data.user,
+            user: user,
           })
         );
+
+        // Also explicitly store in localStorage as backup
+        if (typeof window !== "undefined" && token && user) {
+          try {
+            localStorage.setItem("auth_token", token);
+            localStorage.setItem("user_info", JSON.stringify(user));
+          } catch (error) {
+            console.error("Error storing auth data in localStorage:", error);
+          }
+        }
+
         router.push("/dashboard");
       }
     } catch (error: any) {

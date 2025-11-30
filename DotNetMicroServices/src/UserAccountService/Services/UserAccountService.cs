@@ -1,8 +1,10 @@
 using MongoDB.Driver;
+using MongoDB.Bson;
 using UserAccountService.Data;
 using UserAccountService.DTOs;
 using UserAccountService.Models;
 using Shared.Utils;
+using Shared.Common;
 
 namespace UserAccountService.Services;
 
@@ -21,7 +23,7 @@ public class UserAccountService : IUserAccountService
         return await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
     }
 
-    public async Task<UserAccount?> GetUserByIdAsync(Guid id)
+    public async Task<UserAccount?> GetUserByIdAsync(string id)
     {
         var filter = Builders<UserAccount>.Filter.Eq(u => u.Id, id);
         return await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
@@ -29,7 +31,7 @@ public class UserAccountService : IUserAccountService
 
     public async Task<UserAccount> CreateUserAsync(UserAccount user)
     {
-        user.Id = Guid.NewGuid();
+        // MongoDB will auto-generate ObjectId if Id is null
         user.CreatedAt = DateTimeHelper.GetUtcNow();
         user.UpdatedAt = DateTimeHelper.GetUtcNow();
         user.Role = "user"; // Default role
@@ -39,7 +41,7 @@ public class UserAccountService : IUserAccountService
         return user;
     }
 
-    public async Task<UserAccount?> UpdateUserAsync(Guid id, UserAccount existingUser, UpdateProfileDto dto)
+    public async Task<UserAccount?> UpdateUserAsync(string id, UserAccount existingUser, UpdateProfileDto dto)
     {
         var filter = Builders<UserAccount>.Filter.Eq(u => u.Id, id);
         var user = await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
@@ -62,6 +64,50 @@ public class UserAccountService : IUserAccountService
         
         // Return updated user
         return await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
+    }
+
+    public async Task<PagedResponse<UserAccount>> GetAllUsersAsync(int page, int pageSize, string? searchTerm = null)
+    {
+        FilterDefinition<UserAccount> filter;
+        
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            // Search by name or email (case-insensitive)
+            var nameFilter = Builders<UserAccount>.Filter.Regex(
+                u => u.Name,
+                new BsonRegularExpression(searchTerm, "i")
+            );
+            var emailFilter = Builders<UserAccount>.Filter.Regex(
+                u => u.Email,
+                new BsonRegularExpression(searchTerm, "i")
+            );
+            filter = Builders<UserAccount>.Filter.Or(nameFilter, emailFilter);
+        }
+        else
+        {
+            filter = Builders<UserAccount>.Filter.Empty;
+        }
+
+        var sort = Builders<UserAccount>.Sort.Descending(u => u.CreatedAt);
+
+        var totalCount = await _context.UserAccounts.CountDocumentsAsync(filter);
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var skip = (page - 1) * pageSize;
+        var items = await _context.UserAccounts
+            .Find(filter)
+            .Sort(sort)
+            .Skip(skip)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        return new PagedResponse<UserAccount>
+        {
+            Items = items,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalCount = (int)totalCount
+        };
     }
 }
 

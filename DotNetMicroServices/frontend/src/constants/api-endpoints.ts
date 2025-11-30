@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
     ASSIGNED_USERS: (id: string) => `/Courses/${id}/assigned-users`,
     USER_PROGRESS: (id: string) => `/Courses/${id}/user-progress`,
     HEALTH: "/Courses/health",
+    GET_USER_COURSES: (userId: string) => `/users/${userId}/courses`,
   },
   // Lessons endpoints
   LESSONS: {
@@ -58,24 +59,25 @@ export const API_ENDPOINTS = {
     CREATE: "/Quizzes",
     UPDATE: (id: string) => `/Quizzes/${id}`,
     DELETE: (id: string) => `/Quizzes/${id}`,
-    GET_BY_LESSON: (lessonId: string) => `/Quizzes/lesson/${lessonId}`,
+    GET_BY_LESSON: (lessonId: string) => `/lessons/${lessonId}/quizzes`,
+    UPLOAD: (lessonId: string) => `/lessons/${lessonId}/quizzes/upload`,
   },
   // Quiz Questions endpoints
   QUIZ_QUESTIONS: {
-    GET_ALL: "/QuizQuestions",
-    GET_BY_ID: (id: string) => `/QuizQuestions/${id}`,
-    CREATE: "/QuizQuestions",
-    UPDATE: (id: string) => `/QuizQuestions/${id}`,
-    DELETE: (id: string) => `/QuizQuestions/${id}`,
-    GET_BY_QUIZ: (quizId: string) => `/QuizQuestions/quiz/${quizId}`,
+    GET_ALL: "/quiz-questions",
+    GET_BY_ID: (id: string) => `/quiz-questions/${id}`,
+    CREATE: "/quiz-questions",
+    UPDATE: (id: string) => `/quiz-questions/${id}`,
+    DELETE: (id: string) => `/quiz-questions/${id}`,
+    GET_BY_QUIZ: (quizId: string) => `/quizzes/${quizId}/questions`,
   },
   // Quiz Attempts endpoints
   QUIZ_ATTEMPTS: {
-    CREATE: "/QuizAttempts",
-    GET_BY_ID: (id: string) => `/QuizAttempts/${id}`,
-    ADD_ANSWER: (id: string) => `/QuizAttempts/${id}/answers`,
-    SUBMIT: (id: string) => `/QuizAttempts/${id}/submit`,
-    GET_RESULTS: (id: string) => `/QuizAttempts/${id}/results`,
+    CREATE: "/quiz-attempts",
+    GET_BY_ID: (id: string) => `/quiz-attempts/${id}`,
+    ADD_ANSWER: (id: string) => `/quiz-attempts/${id}/answers`,
+    SUBMIT: (id: string) => `/quiz-attempts/${id}/submit`,
+    GET_RESULTS: (id: string) => `/quiz-attempts/${id}/results`,
   },
   // Progress endpoints
   PROGRESS: {
@@ -91,7 +93,7 @@ export const API_ENDPOINTS = {
   },
   // Users endpoints (Courses-related)
   USERS: {
-    GET_ALL: "/Users",
+    GET_ALL: "/Auth/users",
     GET_BY_ID: (id: string) => `/Users/${id}`,
     SEARCH: "/Users/search",
     GET_COURSES: (userId: string) => `/Users/${userId}/courses`,

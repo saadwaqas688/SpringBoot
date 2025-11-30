@@ -183,12 +183,12 @@ public class CoursesGatewayService : ICoursesGatewayService
                 RabbitMQConstants.CoursesServiceQueue,
                 RabbitMQConstants.Courses.AssignUser,
                 message);
-            return response ?? ApiResponse<object>.ErrorResponse("Failed to assign user");
+            return response ?? ApiResponse<object>.ErrorResponse("Failed to assign users");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error assigning user to course");
-            return ApiResponse<object>.ErrorResponse("An error occurred while assigning user");
+            _logger.LogError(ex, "Error assigning users to course");
+            return ApiResponse<object>.ErrorResponse("An error occurred while assigning users");
         }
     }
 
@@ -1156,6 +1156,45 @@ public class CoursesGatewayService : ICoursesGatewayService
         {
             _logger.LogError(ex, "Error deleting image through gateway");
             return ApiResponse<bool>.ErrorResponse($"Error deleting image: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<object>> UploadQuizFileAsync(string lessonId, IFormFile file, int quizScore)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream();
+            content.Add(new StreamContent(stream), "file", file.FileName);
+            content.Add(new StringContent(quizScore.ToString()), "quizScore");
+
+            var response = await httpClient.PostAsync(
+                $"{_coursesServiceUrl}/api/lessons/{lessonId}/quizzes/upload", 
+                content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<object>.ErrorResponse("Failed to upload quiz file");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<object>.ErrorResponse($"Upload failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading quiz file through gateway");
+            return ApiResponse<object>.ErrorResponse($"Error uploading quiz file: {ex.Message}");
         }
     }
 

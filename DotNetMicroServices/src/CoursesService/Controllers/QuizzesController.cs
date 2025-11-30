@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
+using CoursesService.Services;
 using Shared.Common;
 
 namespace CoursesService.Controllers;
@@ -10,11 +11,19 @@ namespace CoursesService.Controllers;
 public class QuizzesController : ControllerBase
 {
     private readonly IQuizRepository _quizRepository;
+    private readonly IQuizQuestionRepository _questionRepository;
+    private readonly IQuizFileParserService _fileParserService;
     private readonly ILogger<QuizzesController> _logger;
 
-    public QuizzesController(IQuizRepository quizRepository, ILogger<QuizzesController> logger)
+    public QuizzesController(
+        IQuizRepository quizRepository,
+        IQuizQuestionRepository questionRepository,
+        IQuizFileParserService fileParserService,
+        ILogger<QuizzesController> logger)
     {
         _quizRepository = quizRepository;
+        _questionRepository = questionRepository;
+        _fileParserService = fileParserService;
         _logger = logger;
     }
 
@@ -110,6 +119,142 @@ public class QuizzesController : ControllerBase
             return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting quiz"));
         }
     }
+
+    [HttpPost("lessons/{lessonId}/quizzes/upload")]
+    public async Task<ActionResult<ApiResponse<QuizUploadResponse>>> UploadQuizFile(
+        string lessonId,
+        IFormFile file,
+        [FromForm] int quizScore = 100)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse("No file uploaded"));
+            }
+
+            // Validate file type
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".csv", ".xlsx", ".xls", ".xlsm" };
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse(
+                    "Invalid file type. Only CSV and Excel files (.csv, .xlsx, .xls, .xlsm) are allowed."));
+            }
+
+            // Validate file size (50MB max)
+            const long maxFileSize = 50 * 1024 * 1024; // 50MB
+            if (file.Length > maxFileSize)
+            {
+                return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse("File size exceeds 50MB limit"));
+            }
+
+            // Parse the file
+            List<QuizQuestionData> questionData;
+            using (var stream = file.OpenReadStream())
+            {
+                questionData = await _fileParserService.ParseFileAsync(stream, file.FileName);
+            }
+
+            if (questionData.Count == 0)
+            {
+                return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse(
+                    "No valid questions found in the file. Please check the file format."));
+            }
+
+            // Get or create quiz for the lesson
+            var existingQuiz = await _quizRepository.GetByLessonIdAsync(lessonId);
+            Quiz quiz;
+
+            if (existingQuiz != null)
+            {
+                // Update existing quiz
+                existingQuiz.Title = $"Quiz - {file.FileName}";
+                existingQuiz.Description = $"Quiz uploaded from {file.FileName}";
+                quiz = await _quizRepository.UpdateAsync(existingQuiz.Id!, existingQuiz) ?? existingQuiz;
+                
+                // Delete existing questions
+                var existingQuestions = await _questionRepository.GetByQuizIdAsync(quiz.Id!);
+                foreach (var question in existingQuestions)
+                {
+                    if (question.Id != null)
+                    {
+                        await _questionRepository.DeleteAsync(question.Id);
+                    }
+                }
+            }
+            else
+            {
+                // Create new quiz
+                quiz = new Quiz
+                {
+                    LessonId = lessonId,
+                    Title = $"Quiz - {file.FileName}",
+                    Description = $"Quiz uploaded from {file.FileName}"
+                };
+                quiz = await _quizRepository.CreateAsync(quiz);
+            }
+
+            // Create quiz questions
+            var createdQuestions = new List<QuizQuestion>();
+            for (int i = 0; i < questionData.Count; i++)
+            {
+                var qData = questionData[i];
+                var question = new QuizQuestion
+                {
+                    QuizId = quiz.Id!,
+                    Question = qData.Question,
+                    Order = qData.Order,
+                    Options = qData.Options.Select(opt => new QuizOption
+                    {
+                        Value = opt.Value,
+                        IsCorrect = opt.IsCorrect
+                    }).ToList()
+                };
+                var created = await _questionRepository.CreateAsync(question);
+                createdQuestions.Add(created);
+            }
+
+            var response = new QuizUploadResponse
+            {
+                QuizId = quiz.Id!,
+                LessonId = lessonId,
+                QuestionsCount = createdQuestions.Count,
+                QuizScore = quizScore,
+                Message = $"Successfully uploaded {createdQuestions.Count} questions to quiz"
+            };
+
+            _logger.LogInformation("Quiz uploaded successfully for lesson {LessonId}. {Count} questions created.", 
+                lessonId, createdQuestions.Count);
+
+            return Ok(ApiResponse<QuizUploadResponse>.SuccessResponse(response, response.Message));
+        }
+        catch (NotSupportedException ex)
+        {
+            _logger.LogWarning(ex, "Unsupported file type for quiz upload");
+            return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse(ex.Message));
+        }
+        catch (InvalidDataException ex)
+        {
+            _logger.LogWarning(ex, "Invalid file data for quiz upload");
+            return BadRequest(ApiResponse<QuizUploadResponse>.ErrorResponse(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading quiz file for lesson {LessonId}", lessonId);
+            return StatusCode(500, ApiResponse<QuizUploadResponse>.ErrorResponse(
+                $"An error occurred while uploading quiz: {ex.Message}"));
+        }
+    }
+}
+
+public class QuizUploadResponse
+{
+    public string QuizId { get; set; } = string.Empty;
+    public string LessonId { get; set; } = string.Empty;
+    public int QuestionsCount { get; set; }
+    public int QuizScore { get; set; }
+    public string Message { get; set; } = string.Empty;
 }
 
 

@@ -68,6 +68,9 @@ builder.Services.AddScoped<IQuizQuestionRepository>(sp =>
     return new QuizQuestionRepository(context.QuizQuestions, logger);
 });
 
+// Register Services
+builder.Services.AddScoped<IQuizFileParserService, QuizFileParserService>();
+
 builder.Services.AddScoped<IUserCourseRepository>(sp =>
 {
     var context = sp.GetRequiredService<CoursesDbContext>();
@@ -163,11 +166,29 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Ensure database indexes are created
-using (var scope = app.Services.CreateScope())
+// Ensure database indexes are created (with error handling)
+try
 {
-    var context = scope.ServiceProvider.GetRequiredService<CoursesDbContext>();
-    await context.CreateIndexesAsync();
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<CoursesDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        
+        logger.LogInformation("Attempting to create MongoDB indexes...");
+        await context.CreateIndexesAsync();
+        logger.LogInformation("MongoDB indexes created successfully");
+    }
+}
+catch (MongoException ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "Failed to create MongoDB indexes. The application will continue, but some features may not work correctly. " +
+                        "Please ensure MongoDB is running and accessible at: {ConnectionString}", mongoConnectionString);
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An unexpected error occurred while creating MongoDB indexes. The application will continue.");
 }
 
 // Configure the HTTP request pipeline
@@ -197,17 +218,29 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.MapControllers();
 
-// Start RabbitMQ listener
-var rabbitMQService = app.Services.GetRequiredService<IRabbitMQService>();
-
-rabbitMQService.StartListening(RabbitMQConstants.CoursesServiceQueue, async (messageJson, routingKey) =>
+// Start RabbitMQ listener (optional - app will still run if RabbitMQ is unavailable)
+try
 {
-    // Create a scope for each message to resolve scoped services
-    using var scope = app.Services.CreateScope();
-    var messageHandler = scope.ServiceProvider.GetRequiredService<CoursesMessageHandler>();
-    var result = await messageHandler.HandleMessage(messageJson, routingKey);
-    return result;
-});
+    var rabbitMQService = app.Services.GetRequiredService<IRabbitMQService>();
+    
+    rabbitMQService.StartListening(RabbitMQConstants.CoursesServiceQueue, async (messageJson, routingKey) =>
+    {
+        // Create a scope for each message to resolve scoped services
+        using var scope = app.Services.CreateScope();
+        var messageHandler = scope.ServiceProvider.GetRequiredService<CoursesMessageHandler>();
+        var result = await messageHandler.HandleMessage(messageJson, routingKey);
+        return result;
+    });
+    
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("RabbitMQ listener started successfully");
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogWarning(ex, "Failed to start RabbitMQ listener. The application will continue without RabbitMQ messaging. " +
+                          "Please ensure RabbitMQ is running if you need messaging functionality.");
+}
 
 // Run the application
 app.Run();

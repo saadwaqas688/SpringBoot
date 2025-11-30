@@ -25,9 +25,15 @@ public class MongoDbContext
         {
             await UserAccounts.Indexes.CreateOneAsync(indexModel);
         }
-        catch
+        catch (MongoCommandException ex) when (ex.CodeName == "IndexOptionsConflict" || ex.CodeName == "IndexKeySpecsConflict" || ex.CodeName == "IndexAlreadyExists")
         {
-            // Index might already exist, ignore
+            // Index already exists or conflicts, which is fine
+            // We can ignore this error
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Code == 85 || ex.WriteError?.Code == 86)
+        {
+            // Index already exists (error codes 85/86)
+            // We can ignore this error
         }
     }
 }

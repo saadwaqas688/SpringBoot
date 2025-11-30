@@ -58,6 +58,7 @@ public class QuizQuestionsController : ControllerBase
     {
         try
         {
+            question.Type = "quiz";
             var created = await _questionRepository.CreateAsync(question);
             return CreatedAtAction(nameof(GetQuestionById), new { id = created.Id },
                 ApiResponse<QuizQuestion>.SuccessResponse(created, "Question created successfully"));

@@ -22,16 +22,26 @@ public class UserAccountGatewayService : IUserAccountGatewayService
     {
         try
         {
+            _logger.LogInformation("Sending signup request for email: {Email}", dto.Email);
+            
             var response = await _rabbitMQService.SendMessageAsync<ApiResponse<AuthResponseDto>>(
                 RabbitMQConstants.UserAccountServiceQueue,
                 RabbitMQConstants.UserAccount.SignUp,
                 dto);
-            return response ?? ApiResponse<AuthResponseDto>.ErrorResponse("Failed to sign up");
+            
+            if (response == null)
+            {
+                _logger.LogWarning("Null response from UserAccountService for signup. Email: {Email}. User may have been created but response was lost.", dto.Email);
+                return ApiResponse<AuthResponseDto>.ErrorResponse("Failed to sign up. The user may have been created, but we didn't receive a confirmation. Please try signing in.");
+            }
+            
+            _logger.LogInformation("Signup successful for email: {Email}", dto.Email);
+            return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling UserAccountService for signup");
-            return ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during signup");
+            _logger.LogError(ex, "Error calling UserAccountService for signup. Email: {Email}", dto.Email);
+            return ApiResponse<AuthResponseDto>.ErrorResponse($"An error occurred during signup: {ex.Message}");
         }
     }
 
@@ -43,12 +53,19 @@ public class UserAccountGatewayService : IUserAccountGatewayService
                 RabbitMQConstants.UserAccountServiceQueue,
                 RabbitMQConstants.UserAccount.SignIn,
                 dto);
-            return response ?? ApiResponse<AuthResponseDto>.ErrorResponse("Failed to sign in");
+            
+            if (response == null)
+            {
+                _logger.LogWarning("Null response from UserAccountService for signin. Email: {Email}", dto.Email);
+                return ApiResponse<AuthResponseDto>.ErrorResponse("Failed to sign in. Please check if UserAccountService is running and RabbitMQ is connected.");
+            }
+            
+            return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling UserAccountService for signin");
-            return ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during signin");
+            _logger.LogError(ex, "Error calling UserAccountService for signin. Email: {Email}", dto.Email);
+            return ApiResponse<AuthResponseDto>.ErrorResponse($"An error occurred during signin: {ex.Message}");
         }
     }
 
@@ -85,6 +102,24 @@ public class UserAccountGatewayService : IUserAccountGatewayService
         {
             _logger.LogError(ex, "Error calling UserAccountService to get current user");
             return ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while retrieving user");
+        }
+    }
+
+    public async Task<ApiResponse<PagedResponse<UserInfoDto>>> GetAllUsersAsync(int page, int pageSize, string? searchTerm = null)
+    {
+        try
+        {
+            var message = new { Page = page, PageSize = pageSize, SearchTerm = searchTerm };
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<PagedResponse<UserInfoDto>>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.GetAllUsers,
+                message);
+            return response ?? ApiResponse<PagedResponse<UserInfoDto>>.ErrorResponse("Failed to get users");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService to get all users");
+            return ApiResponse<PagedResponse<UserInfoDto>>.ErrorResponse("An error occurred while retrieving users");
         }
     }
 

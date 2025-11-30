@@ -43,7 +43,26 @@ export const slidesAPI = baseAPI.injectEndpoints({
           pageSize,
         },
       }),
-      providesTags: [SLIDES],
+      providesTags: (result, error, arg) => [
+        { type: SLIDES, id: arg.lessonId },
+        SLIDES,
+      ],
+      // Serialize query args to ensure proper caching
+      serializeQueryArgs: ({ endpointName, queryArgs }) => {
+        const { lessonId, page, pageSize } = queryArgs;
+        return `${endpointName}(${lessonId})_${page}_${pageSize}`;
+      },
+      // Merge function to handle pagination
+      merge: (currentCache, newItems) => {
+        if (Array.isArray(newItems?.data)) {
+          return { ...newItems, data: newItems.data };
+        }
+        return newItems;
+      },
+      // Force refetch on arg change
+      forceRefetch({ currentArg, previousArg }) {
+        return currentArg?.lessonId !== previousArg?.lessonId;
+      },
     }),
   }),
 });

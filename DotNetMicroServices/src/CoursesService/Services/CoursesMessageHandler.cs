@@ -4,6 +4,7 @@ using System.Text.Json;
 using CoursesService.Models;
 using CoursesService.Repositories;
 using MongoDB.Driver;
+using System.Linq;
 
 namespace CoursesService.Services;
 
@@ -259,20 +260,71 @@ public class CoursesMessageHandler
     private async Task<object> HandleAssignUser(string messageJson)
     {
         var request = JsonSerializer.Deserialize<AssignUserRequest>(messageJson, _jsonOptions);
-        if (string.IsNullOrEmpty(request?.CourseId) || string.IsNullOrEmpty(request?.Dto?.UserId))
+        if (string.IsNullOrEmpty(request?.CourseId) || request?.Dto?.UserIds == null || request.Dto.UserIds.Length == 0)
         {
-            return ApiResponse<object>.ErrorResponse("CourseId and UserId are required");
+            return ApiResponse<object>.ErrorResponse("CourseId and at least one UserId are required");
         }
-        var userCourse = new UserCourse
+
+        var assignedUsers = new List<object>();
+        var alreadyAssigned = new List<string>();
+        var failedUsers = new List<string>();
+
+        foreach (var userId in request.Dto.UserIds.Distinct())
         {
-            UserId = request.Dto.UserId,
-            CourseId = request.CourseId,
-            Status = "not_started",
-            Progress = 0,
-            AssignedAt = DateTime.UtcNow
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                failedUsers.Add(userId ?? "null");
+                continue;
+            }
+
+            try
+            {
+                var existing = await _userCourseRepository.GetByUserAndCourseAsync(userId, request.CourseId);
+                if (existing != null)
+                {
+                    alreadyAssigned.Add(userId);
+                    continue;
+                }
+
+                var userCourse = new UserCourse
+                {
+                    UserId = userId,
+                    CourseId = request.CourseId,
+                    Status = "not_started",
+                    Progress = 0,
+                    AssignedAt = DateTime.UtcNow
+                };
+                var created = await _userCourseRepository.CreateAsync(userCourse);
+                assignedUsers.Add(created);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error assigning user {UserId} to course {CourseId}", userId, request.CourseId);
+                failedUsers.Add(userId);
+            }
+        }
+
+        var response = new
+        {
+            AssignedCount = assignedUsers.Count,
+            AlreadyAssignedCount = alreadyAssigned.Count,
+            FailedCount = failedUsers.Count,
+            AssignedUsers = assignedUsers,
+            AlreadyAssignedUserIds = alreadyAssigned,
+            FailedUserIds = failedUsers
         };
-        var created = await _userCourseRepository.CreateAsync(userCourse);
-        return ApiResponse<object>.SuccessResponse(created, "User assigned successfully");
+
+        var message = $"Assigned {assignedUsers.Count} user(s) successfully";
+        if (alreadyAssigned.Count > 0)
+        {
+            message += $", {alreadyAssigned.Count} user(s) were already assigned";
+        }
+        if (failedUsers.Count > 0)
+        {
+            message += $", {failedUsers.Count} user(s) failed to assign";
+        }
+
+        return ApiResponse<object>.SuccessResponse(response, message);
     }
 
     private async Task<object> HandleRemoveUser(string messageJson)
@@ -649,6 +701,7 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Invalid question data");
         }
+        question.Type = "quiz";
         var created = await _questionRepository.CreateAsync(question);
         return ApiResponse<object>.SuccessResponse(created, "Question created successfully");
     }
@@ -943,9 +996,38 @@ public class CoursesMessageHandler
         {
             return ApiResponse<List<object>>.ErrorResponse("UserId is required");
         }
-        var courses = await _userCourseRepository.GetByUserIdAsync(request.UserId);
+        var userCourses = await _userCourseRepository.GetByUserIdAsync(request.UserId);
+        var courseIds = userCourses.Select(uc => uc.CourseId).ToList();
+        
+        // Get full course details for each courseId
+        var courses = new List<object>();
+        
+        foreach (var courseId in courseIds)
+        {
+            var courseResponse = await _courseService.GetByIdAsync(courseId);
+            if (courseResponse.Success && courseResponse.Data != null)
+            {
+                var course = courseResponse.Data;
+                var userCourse = userCourses.FirstOrDefault(uc => uc.CourseId == courseId);
+                courses.Add(new
+                {
+                    Id = course.Id,
+                    Title = course.Title,
+                    Description = course.Description,
+                    Thumbnail = course.Thumbnail,
+                    Status = course.Status,
+                    CreatedAt = course.CreatedAt,
+                    UpdatedAt = course.UpdatedAt,
+                    Progress = userCourse?.Progress ?? 0,
+                    EnrollmentStatus = userCourse?.Status ?? "not_started",
+                    AssignedAt = userCourse?.AssignedAt,
+                    CompletedAt = userCourse?.CompletedAt
+                });
+            }
+        }
+        
         var paged = courses.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
-        return ApiResponse<List<object>>.SuccessResponse(paged.Cast<object>().ToList(), "User courses retrieved successfully");
+        return ApiResponse<List<object>>.SuccessResponse(paged, "User courses retrieved successfully");
     }
 
     private async Task<object> HandleGetUserProgress(string messageJson)
@@ -1040,7 +1122,7 @@ public class CoursesMessageHandler
 
     private class AssignUserDto
     {
-        public string UserId { get; set; } = string.Empty;
+        public string[] UserIds { get; set; } = Array.Empty<string>();
     }
 
     private class RemoveUserRequest

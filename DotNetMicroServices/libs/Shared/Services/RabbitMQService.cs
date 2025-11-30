@@ -37,22 +37,33 @@ public class RabbitMQService : IRabbitMQService, IDisposable
         // Retry connection with exponential backoff
         const int maxRetries = 5;
         var retryDelay = TimeSpan.FromSeconds(2);
+        IConnection? connection = null;
+        IModel? channel = null;
         
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
             {
-                _connection = factory.CreateConnection();
-                _channel = _connection.CreateModel();
+                connection = factory.CreateConnection();
+                channel = connection.CreateModel();
                 
                 // Declare exchange
-                _channel.ExchangeDeclare(_exchangeName, ExchangeType.Topic, durable: true);
+                channel.ExchangeDeclare(_exchangeName, ExchangeType.Topic, durable: true);
+                
+                _connection = connection;
+                _channel = channel;
                 
                 _logger.LogInformation("RabbitMQ connection established");
                 return;
             }
             catch (Exception ex)
             {
+                // Clean up on failure
+                channel?.Close();
+                channel?.Dispose();
+                connection?.Close();
+                connection?.Dispose();
+                
                 _logger.LogWarning(ex, "Failed to establish RabbitMQ connection (attempt {Attempt}/{MaxRetries})", attempt, maxRetries);
                 
                 if (attempt == maxRetries)
@@ -65,6 +76,9 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                 retryDelay = TimeSpan.FromSeconds(retryDelay.TotalSeconds * 2); // Exponential backoff
             }
         }
+        
+        // This should never be reached, but compiler needs it
+        throw new InvalidOperationException("Failed to initialize RabbitMQ connection");
     }
 
     public async Task<T?> SendMessageAsync<T>(string queueName, string routingKey, object message)
@@ -74,19 +88,26 @@ public class RabbitMQService : IRabbitMQService, IDisposable
             // Ensure queue exists (listener should have already created and bound it)
             _channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
 
-            // Create response queue
-            var replyQueueName = _channel.QueueDeclare().QueueName;
+            // Create response queue (temporary, auto-delete)
+            var replyQueueName = _channel.QueueDeclare(exclusive: true, autoDelete: true).QueueName;
             var correlationId = Guid.NewGuid().ToString();
             var tcs = new TaskCompletionSource<T?>();
             var consumer = new EventingBasicConsumer(_channel);
+            string? consumerTag = null;
 
             // Set up response consumer
             consumer.Received += (model, ea) =>
             {
+                _logger.LogInformation("Received response message. Correlation ID: {ReceivedCorrelationId}, Expected: {ExpectedCorrelationId}, Queue: {Queue}", 
+                    ea.BasicProperties.CorrelationId, correlationId, replyQueueName);
+                
                 if (ea.BasicProperties.CorrelationId == correlationId)
                 {
                     var body = ea.Body.ToArray();
                     var responseJson = Encoding.UTF8.GetString(body);
+                    
+                    _logger.LogInformation("Response received for correlation ID {CorrelationId}. Response length: {Length}", 
+                        correlationId, responseJson.Length);
                     
                     try
                     {
@@ -95,13 +116,23 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to deserialize response");
+                        _logger.LogError(ex, "Failed to deserialize response. Response JSON: {ResponseJson}", responseJson);
                         tcs.SetResult(default(T));
                     }
                 }
+                else
+                {
+                    _logger.LogWarning("Ignoring response with mismatched correlation ID. Received: {Received}, Expected: {Expected}", 
+                        ea.BasicProperties.CorrelationId, correlationId);
+                }
             };
 
-            _channel.BasicConsume(queue: replyQueueName, autoAck: true, consumer: consumer);
+            consumerTag = _channel.BasicConsume(queue: replyQueueName, autoAck: true, consumer: consumer);
+            _logger.LogInformation("Reply queue consumer started. Queue: {ReplyQueue}, ConsumerTag: {ConsumerTag}, CorrelationId: {CorrelationId}", 
+                replyQueueName, consumerTag, correlationId);
+
+            // Small delay to ensure consumer is ready (helps with timing issues)
+            await Task.Delay(50);
 
             // Serialize and send message
             var messageJson = JsonSerializer.Serialize(message, _jsonOptions);
@@ -118,7 +149,8 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                 basicProperties: properties,
                 body: messageBody);
 
-            _logger.LogDebug("Message sent to queue {QueueName} with routing key {RoutingKey}", queueName, routingKey);
+            _logger.LogInformation("Message sent to exchange {Exchange} with routing key {RoutingKey}, correlation ID: {CorrelationId}, reply queue: {ReplyQueue}", 
+                _exchangeName, routingKey, correlationId, replyQueueName);
 
             // Wait for response with timeout
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
@@ -126,11 +158,41 @@ public class RabbitMQService : IRabbitMQService, IDisposable
 
             if (completedTask == timeoutTask)
             {
-                _logger.LogWarning("Timeout waiting for response from {QueueName}", queueName);
+                _logger.LogWarning("Timeout waiting for response from {QueueName} with routing key {RoutingKey}. Correlation ID: {CorrelationId}", 
+                    queueName, routingKey, correlationId);
+                
+                // Cancel consumer if still active
+                if (!string.IsNullOrEmpty(consumerTag))
+                {
+                    try
+                    {
+                        _channel.BasicCancel(consumerTag);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error canceling consumer");
+                    }
+                }
+                
                 return default(T);
             }
 
-            return await tcs.Task;
+            var result = await tcs.Task;
+            
+            // Cancel consumer after receiving response
+            if (!string.IsNullOrEmpty(consumerTag))
+            {
+                try
+                {
+                    _channel.BasicCancel(consumerTag);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error canceling consumer after response");
+                }
+            }
+            
+            return result;
         }
         catch (Exception ex)
         {
@@ -189,7 +251,8 @@ public class RabbitMQService : IRabbitMQService, IDisposable
 
                 try
                 {
-                    _logger.LogDebug("Received message on queue {QueueName} with routing key {RoutingKey}", queueName, routingKey);
+                    _logger.LogInformation("Received message on queue {QueueName} with routing key {RoutingKey}. Correlation ID: {CorrelationId}, ReplyTo: {ReplyTo}", 
+                        queueName, routingKey, ea.BasicProperties.CorrelationId, ea.BasicProperties.ReplyTo);
                     
                     var response = await messageHandler(messageJson, routingKey);
                     
@@ -204,7 +267,13 @@ public class RabbitMQService : IRabbitMQService, IDisposable
                             basicProperties: replyProperties,
                             body: responseBody);
                         
-                        _logger.LogDebug("Response sent for message with correlation ID {CorrelationId}", ea.BasicProperties.CorrelationId);
+                        _logger.LogInformation("Response sent to queue {ReplyQueue} for correlation ID {CorrelationId}. Response length: {Length}", 
+                            ea.BasicProperties.ReplyTo, ea.BasicProperties.CorrelationId, responseJson.Length);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Response is null or ReplyTo is empty. Response: {IsNull}, ReplyTo: {ReplyTo}", 
+                            response == null, ea.BasicProperties.ReplyTo);
                     }
                 }
                 catch (Exception ex)

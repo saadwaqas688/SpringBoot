@@ -3,6 +3,7 @@ using CoursesService.Models;
 using CoursesService.Services;
 using CoursesService.Repositories;
 using Shared.Common;
+using System.Linq;
 
 namespace CoursesService.Controllers;
 
@@ -83,32 +84,81 @@ public class CoursesController : ControllerBase
     }
 
     [HttpPost("{id}/assign-user")]
-    public async Task<ActionResult<ApiResponse<UserCourse>>> AssignUser(string id, [FromBody] AssignUserDto dto)
+    public async Task<ActionResult<ApiResponse<AssignUsersResponse>>> AssignUser(string id, [FromBody] AssignUserDto dto)
     {
         try
         {
-            var existing = await _userCourseRepository.GetByUserAndCourseAsync(dto.UserId, id);
-            if (existing != null)
+            if (dto.UserIds == null || dto.UserIds.Length == 0)
             {
-                return BadRequest(ApiResponse<UserCourse>.ErrorResponse("User is already assigned to this course"));
+                return BadRequest(ApiResponse<AssignUsersResponse>.ErrorResponse("At least one user ID is required"));
             }
 
-            var userCourse = new UserCourse
+            var assignedUsers = new List<UserCourse>();
+            var alreadyAssigned = new List<string>();
+            var failedUsers = new List<string>();
+
+            foreach (var userId in dto.UserIds.Distinct())
             {
-                UserId = dto.UserId,
-                CourseId = id,
-                Status = "not_started",
-                Progress = 0,
-                AssignedAt = DateTime.UtcNow
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    failedUsers.Add(userId ?? "null");
+                    continue;
+                }
+
+                try
+                {
+                    var existing = await _userCourseRepository.GetByUserAndCourseAsync(userId, id);
+                    if (existing != null)
+                    {
+                        alreadyAssigned.Add(userId);
+                        continue;
+                    }
+
+                    var userCourse = new UserCourse
+                    {
+                        UserId = userId,
+                        CourseId = id,
+                        Status = "not_started",
+                        Progress = 0,
+                        AssignedAt = DateTime.UtcNow
+                    };
+
+                    var created = await _userCourseRepository.CreateAsync(userCourse);
+                    assignedUsers.Add(created);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error assigning user {UserId} to course {CourseId}", userId, id);
+                    failedUsers.Add(userId);
+                }
+            }
+
+            var response = new AssignUsersResponse
+            {
+                AssignedCount = assignedUsers.Count,
+                AlreadyAssignedCount = alreadyAssigned.Count,
+                FailedCount = failedUsers.Count,
+                AssignedUsers = assignedUsers,
+                AlreadyAssignedUserIds = alreadyAssigned,
+                FailedUserIds = failedUsers
             };
 
-            var created = await _userCourseRepository.CreateAsync(userCourse);
-            return Ok(ApiResponse<UserCourse>.SuccessResponse(created, "User assigned to course successfully"));
+            var message = $"Assigned {assignedUsers.Count} user(s) to course";
+            if (alreadyAssigned.Count > 0)
+            {
+                message += $", {alreadyAssigned.Count} user(s) were already assigned";
+            }
+            if (failedUsers.Count > 0)
+            {
+                message += $", {failedUsers.Count} user(s) failed to assign";
+            }
+
+            return Ok(ApiResponse<AssignUsersResponse>.SuccessResponse(response, message));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error assigning user to course");
-            return StatusCode(500, ApiResponse<UserCourse>.ErrorResponse("An error occurred while assigning user"));
+            _logger.LogError(ex, "Error assigning users to course");
+            return StatusCode(500, ApiResponse<AssignUsersResponse>.ErrorResponse("An error occurred while assigning users"));
         }
     }
 
@@ -180,7 +230,17 @@ public class CoursesController : ControllerBase
 
 public class AssignUserDto
 {
-    public string UserId { get; set; } = string.Empty;
+    public string[] UserIds { get; set; } = Array.Empty<string>();
+}
+
+public class AssignUsersResponse
+{
+    public int AssignedCount { get; set; }
+    public int AlreadyAssignedCount { get; set; }
+    public int FailedCount { get; set; }
+    public List<UserCourse> AssignedUsers { get; set; } = new();
+    public List<string> AlreadyAssignedUserIds { get; set; } = new();
+    public List<string> FailedUserIds { get; set; } = new();
 }
 
 public class CourseUserProgressDto

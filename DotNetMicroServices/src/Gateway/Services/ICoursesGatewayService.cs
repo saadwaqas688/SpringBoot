@@ -86,5 +86,8 @@ public interface ICoursesGatewayService
     // Upload endpoints (handles both images and videos)
     Task<ApiResponse<string>> UploadImageAsync(IFormFile file);
     Task<ApiResponse<bool>> DeleteImageAsync(string fileName);
+    
+    // Quiz upload endpoint
+    Task<ApiResponse<object>> UploadQuizFileAsync(string lessonId, IFormFile file, int quizScore);
 }
 

@@ -27,6 +27,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   useGetAllCoursesQuery,
+  useGetUserCoursesQuery,
   useDeleteCourseMutation,
 } from "@/services/courses-api";
 import CreateCourseModal from "@/components/CreateCourseModal";
@@ -114,6 +115,26 @@ const ActionIconButton = styled(IconButton)`
 
 export default function CoursesPage() {
   const router = useRouter();
+  
+  // Get user info from localStorage instead of Redux state (persists on refresh)
+  const getUserFromStorage = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const userInfo = localStorage.getItem("user_info");
+      if (userInfo) {
+        return JSON.parse(userInfo);
+      }
+    } catch (error) {
+      console.error("Error reading user info from localStorage:", error);
+    }
+    return null;
+  };
+  
+  const user = getUserFromStorage();
+  const userRole = user?.role || user?.Role || "";
+  const isUserRole = userRole.toLowerCase() === "user";
+  const userId = user?.id || user?.Id || user?._id || "";
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [tabValue, setTabValue] = useState(0);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -122,13 +143,32 @@ export default function CoursesPage() {
   const [selectedCourse, setSelectedCourse] = useState<any>(null);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
-  const { data, isLoading, error } = useGetAllCoursesQuery({
-    page: 1,
-    pageSize: 12,
-  });
+  
+  // Fetch courses based on user role
+  const { data: allCoursesData, isLoading: isLoadingAll, error: errorAll } = useGetAllCoursesQuery(
+    {
+      page: 1,
+      pageSize: 12,
+    },
+    { skip: isUserRole } // Skip if user role
+  );
+  
+  const { data: userCoursesData, isLoading: isLoadingUser, error: errorUser } = useGetUserCoursesQuery(
+    {
+      userId: userId,
+      page: 1,
+      pageSize: 12,
+    },
+    { skip: !isUserRole || !userId } // Skip if not user role or no userId
+  );
+  
+  const isLoading = isUserRole ? isLoadingUser : isLoadingAll;
+  const error = isUserRole ? errorUser : errorAll;
+  const courses = isUserRole 
+    ? (userCoursesData?.data || [])
+    : (allCoursesData?.data?.items || []);
+  
   const [deleteCourse, { isLoading: isDeleting }] = useDeleteCourseMutation();
-
-  const courses = data?.data?.items || [];
 
   const handleEdit = (e: React.MouseEvent, course: any) => {
     e.stopPropagation();
@@ -204,37 +244,41 @@ export default function CoursesPage() {
           <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
             Courses
           </Typography>
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <Button
-              variant="contained"
-              sx={{ bgcolor: "#4f46e5", textTransform: "none" }}
-              startIcon={<LibraryBooksIcon />}
-            >
-              Browse Course Library
-            </Button>
-            <Button
-              variant="outlined"
-              sx={{ textTransform: "none" }}
-              startIcon={<CheckCircleIcon />}
-            >
-              View Archived Courses
-            </Button>
-            <Button
-              variant="contained"
-              sx={{ bgcolor: "#6366f1", textTransform: "none" }}
-              startIcon={<AddIcon />}
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              Create Course
-            </Button>
-          </Box>
+          {!isUserRole && (
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <Button
+                variant="contained"
+                sx={{ bgcolor: "#4f46e5", textTransform: "none" }}
+                startIcon={<LibraryBooksIcon />}
+              >
+                Browse Course Library
+              </Button>
+              <Button
+                variant="outlined"
+                sx={{ textTransform: "none" }}
+                startIcon={<CheckCircleIcon />}
+              >
+                View Archived Courses
+              </Button>
+              <Button
+                variant="contained"
+                sx={{ bgcolor: "#6366f1", textTransform: "none" }}
+                startIcon={<AddIcon />}
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                Create Course
+              </Button>
+            </Box>
+          )}
         </PageHeader>
       </Box>
 
-      <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} sx={{ mb: 3 }}>
-        <Tab label="Standard" />
-        <Tab label="Paths" />
-      </Tabs>
+      {!isUserRole && (
+        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} sx={{ mb: 3 }}>
+          <Tab label="Standard" />
+          <Tab label="Paths" />
+        </Tabs>
+      )}
 
       <SearchBar>
         <TextField
@@ -296,23 +340,25 @@ export default function CoursesPage() {
                     course.thumbnail ||
                     course.imageUrl
                   ) && <>{(course.Title || course.title)?.charAt(0) || "C"}</>}
-                  <ActionIcons className="action-icons">
-                    <ActionIconButton
-                      size="small"
-                      onClick={(e) => handleEdit(e, course)}
-                      aria-label="Edit course"
-                    >
-                      <EditIcon fontSize="small" />
-                    </ActionIconButton>
-                    <ActionIconButton
-                      size="small"
-                      className="delete"
-                      onClick={(e) => handleDelete(e, course)}
-                      aria-label="Delete course"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </ActionIconButton>
-                  </ActionIcons>
+                  {!isUserRole && (
+                    <ActionIcons className="action-icons">
+                      <ActionIconButton
+                        size="small"
+                        onClick={(e) => handleEdit(e, course)}
+                        aria-label="Edit course"
+                      >
+                        <EditIcon fontSize="small" />
+                      </ActionIconButton>
+                      <ActionIconButton
+                        size="small"
+                        className="delete"
+                        onClick={(e) => handleDelete(e, course)}
+                        aria-label="Delete course"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </ActionIconButton>
+                    </ActionIcons>
+                  )}
                 </CourseImage>
                 <CardContent>
                   <Typography variant="h6" component="h3" gutterBottom noWrap>
@@ -373,7 +419,9 @@ export default function CoursesPage() {
                 color="text.secondary"
                 sx={{ py: 4 }}
               >
-                No courses found. Create your first course!
+                {isUserRole 
+                  ? "No enrolled courses found." 
+                  : "No courses found. Create your first course!"}
               </Typography>
             </Grid>
           )}

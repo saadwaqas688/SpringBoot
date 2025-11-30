@@ -58,7 +58,7 @@ public class AuthController : ControllerBase
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = createdUser.Id,
+                    Id = createdUser.Id ?? string.Empty,
                     Name = createdUser.Name,
                     Email = createdUser.Email,
                     Image = createdUser.Image,
@@ -100,7 +100,7 @@ public class AuthController : ControllerBase
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = user.Id,
+                    Id = user.Id ?? string.Empty,
                     Name = user.Name,
                     Email = user.Email,
                     Image = user.Image,
@@ -125,11 +125,12 @@ public class AuthController : ControllerBase
         {
             // Get user ID from JWT token
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            if (userIdClaim == null || string.IsNullOrEmpty(userIdClaim.Value))
             {
                 return Unauthorized(ApiResponse<UserInfoDto>.ErrorResponse("Invalid token"));
             }
 
+            var userId = userIdClaim.Value;
             var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
@@ -169,11 +170,12 @@ public class AuthController : ControllerBase
         try
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            if (userIdClaim == null || string.IsNullOrEmpty(userIdClaim.Value))
             {
                 return Unauthorized(ApiResponse<UserInfoDto>.ErrorResponse("Invalid token"));
             }
 
+            var userId = userIdClaim.Value;
             var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
@@ -206,11 +208,12 @@ public class AuthController : ControllerBase
             // For now, we'll validate the token and generate a new one
             // In production, you'd validate the refresh token from a token store
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            if (userIdClaim == null || string.IsNullOrEmpty(userIdClaim.Value))
             {
                 return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid token"));
             }
 
+            var userId = userIdClaim.Value;
             var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
@@ -223,7 +226,7 @@ public class AuthController : ControllerBase
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = user.Id,
+                    Id = user.Id ?? string.Empty,
                     Name = user.Name,
                     Email = user.Email,
                     Image = user.Image,
@@ -279,7 +282,7 @@ public class AuthController : ControllerBase
             user.PasswordHash = _authService.HashPassword(dto.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            var updated = await _userAccountService.UpdateUserAsync(user.Id, user, null);
+            var updated = await _userAccountService.UpdateUserAsync(user.Id ?? string.Empty, user, null);
             if (updated == null)
             {
                 return BadRequest(ApiResponse<string>.ErrorResponse("Failed to reset password"));
@@ -291,6 +294,42 @@ public class AuthController : ControllerBase
         {
             _logger.LogError(ex, "Error resetting password");
             return StatusCode(500, ApiResponse<string>.ErrorResponse("An error occurred while resetting password"));
+        }
+    }
+
+    [HttpGet("users")]
+    public async Task<ActionResult<ApiResponse<PagedResponse<UserInfoDto>>>> GetUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null)
+    {
+        try
+        {
+            var pagedUsers = await _userAccountService.GetAllUsersAsync(page, pageSize, searchTerm);
+            
+            var userDtos = pagedUsers.Items.Select(u => new UserInfoDto
+            {
+                Id = u.Id ?? string.Empty,
+                Name = u.Name,
+                Email = u.Email,
+                Image = u.Image,
+                Role = u.Role
+            }).ToList();
+
+            var pagedResponse = new PagedResponse<UserInfoDto>
+            {
+                Items = userDtos,
+                PageNumber = pagedUsers.PageNumber,
+                PageSize = pagedUsers.PageSize,
+                TotalCount = pagedUsers.TotalCount
+            };
+
+            return Ok(ApiResponse<PagedResponse<UserInfoDto>>.SuccessResponse(pagedResponse, "Users retrieved successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving users");
+            return StatusCode(500, ApiResponse<PagedResponse<UserInfoDto>>.ErrorResponse("An error occurred while retrieving users"));
         }
     }
 }

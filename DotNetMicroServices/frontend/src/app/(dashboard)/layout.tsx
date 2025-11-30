@@ -29,7 +29,7 @@ import {
   ChatBubble as ChatIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
-import { useAppDispatch, useAppSelector } from "@/redux-store";
+import { useAppDispatch } from "@/redux-store";
 import { clearCredentials } from "@/redux-store";
 import styled from "styled-components";
 
@@ -45,6 +45,13 @@ const MainContent = styled(Box)`
   flex-grow: 1;
   background: #f5f5f5;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  
+  @media (max-width: 960px) {
+    width: 100vw;
+    overflow-x: hidden;
+  }
 `;
 
 const Header = styled(AppBar)`
@@ -60,9 +67,17 @@ const SearchBox = styled(Box)`
   border-radius: 8px;
   padding: 8px 16px;
   width: 300px;
+  
+  @media (max-width: 960px) {
+    width: 200px;
+  }
+  
+  @media (max-width: 600px) {
+    display: none;
+  }
 `;
 
-const menuItems = [
+const allMenuItems = [
   { text: "Dashboard", icon: DashboardIcon, path: "/dashboard" },
   {
     text: "Content",
@@ -83,6 +98,12 @@ const menuItems = [
   { text: "Settings", icon: SettingsIcon, path: "/settings" },
 ];
 
+// Menu items for user role (only Dashboard and Courses)
+const userMenuItems = [
+  { text: "Dashboard", icon: DashboardIcon, path: "/dashboard" },
+  { text: "Courses", icon: FolderIcon, path: "/courses" },
+];
+
 export default function DashboardLayout({
   children,
 }: {
@@ -92,7 +113,26 @@ export default function DashboardLayout({
   const dispatch = useAppDispatch();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Content"]);
-  const user = useAppSelector((state) => state.auth.user);
+  
+  // Get user role from localStorage instead of Redux state (persists on refresh)
+  const getUserRoleFromStorage = () => {
+    if (typeof window === "undefined") return "";
+    try {
+      const userInfo = localStorage.getItem("user_info");
+      if (userInfo) {
+        const user = JSON.parse(userInfo);
+        return user?.role || user?.Role || "";
+      }
+    } catch (error) {
+      console.error("Error reading user info from localStorage:", error);
+    }
+    return "";
+  };
+  
+  // Filter menu items based on user role
+  const userRole = getUserRoleFromStorage();
+  const isUserRole = userRole.toLowerCase() === "user";
+  const menuItems = isUserRole ? userMenuItems : allMenuItems;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -122,7 +162,7 @@ export default function DashboardLayout({
             <ListItem disablePadding>
               <ListItemButton
                 onClick={() => {
-                  if (item.children) {
+                  if (item.children && !isUserRole) {
                     toggleExpand(item.text);
                   } else {
                     router.push(item.path);
@@ -137,14 +177,14 @@ export default function DashboardLayout({
                   <item.icon />
                 </ListItemIcon>
                 <ListItemText primary={item.text} />
-                {item.children && (
+                {item.children && !isUserRole && (
                   <Typography>
                     {expandedItems.includes(item.text) ? "▲" : "▼"}
                   </Typography>
                 )}
               </ListItemButton>
             </ListItem>
-            {item.children && expandedItems.includes(item.text) && (
+            {item.children && !isUserRole && expandedItems.includes(item.text) && (
               <List sx={{ pl: 4 }}>
                 {item.children.map((child) => (
                   <ListItem key={child.text} disablePadding>
@@ -187,6 +227,7 @@ export default function DashboardLayout({
           left: 20,
           color: "rgba(255, 255, 255, 0.7)",
           fontSize: "0.75rem",
+          display: { xs: "none", sm: "block" },
         }}
       >
         Copyright © Consultancy Outfit
@@ -195,7 +236,7 @@ export default function DashboardLayout({
   );
 
   return (
-    <Box sx={{ display: "flex" }}>
+    <Box sx={{ display: "flex", width: "100%", overflowX: "hidden" }}>
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
@@ -231,7 +272,7 @@ export default function DashboardLayout({
       </Box>
       <MainContent>
         <Header position="static">
-          <Toolbar>
+          <Toolbar sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, gap: { xs: 1, sm: 0 } }}>
             <IconButton
               color="inherit"
               edge="start"
@@ -240,21 +281,35 @@ export default function DashboardLayout({
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ 
+                flexGrow: 1,
+                fontSize: { xs: "0.875rem", sm: "1.25rem" },
+                display: { xs: "none", sm: "block" }
+              }}
+            >
               Compliance Sheet L&D
             </Typography>
             <SearchBox>
               <SearchIcon sx={{ color: "#9ca3af", mr: 1 }} />
               <InputBase placeholder="Search..." sx={{ flex: 1 }} />
             </SearchBox>
-            <IconButton color="inherit" sx={{ ml: 2 }}>
-              <NotificationsIcon />
-            </IconButton>
-            <Typography sx={{ ml: 2, mr: 1 }}>Welcome!</Typography>
-            <Avatar sx={{ bgcolor: "#10b981" }}>T</Avatar>
+            <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.5, sm: 1 } }}>
+              <IconButton color="inherit" sx={{ display: { xs: "none", sm: "flex" } }}>
+                <NotificationsIcon />
+              </IconButton>
+              <Typography sx={{ display: { xs: "none", md: "block" }, mr: 1 }}>
+                Welcome!
+              </Typography>
+              <Avatar sx={{ bgcolor: "#10b981", width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                T
+              </Avatar>
+            </Box>
           </Toolbar>
         </Header>
-        <Box sx={{ p: 3 }}>{children}</Box>
+        <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>{children}</Box>
       </MainContent>
     </Box>
   );

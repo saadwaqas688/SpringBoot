@@ -89,12 +89,12 @@ public class AuthController : ControllerBase
 
     [Authorize(Roles = "admin")]
     [HttpGet("users")]
-    public async Task<ActionResult<ApiResponse<PagedResponse<object>>>> GetAllUsers(
+    public async Task<ActionResult<ApiResponse<PagedResponse<UserInfoDto>>>> GetAllUsers(
         [FromQuery] int page = 1, 
         [FromQuery] int pageSize = 10, 
-        [FromQuery] string? search = null)
+        [FromQuery] string? searchTerm = null)
     {
-        var response = await _coursesGatewayService.GetAllUsersAsync(page, pageSize, search);
+        var response = await _userAccountGatewayService.GetAllUsersAsync(page, pageSize, searchTerm);
         return StatusCode(response.Success ? 200 : 500, response);
     }
 }

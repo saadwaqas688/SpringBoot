@@ -145,32 +145,48 @@ export default function MediaPreviewModal({
             />
           ) : (
             <Box
-              component="video"
-              src={url}
-              controls
-              autoPlay
-              muted={false}
-              onClick={(e) => e.stopPropagation()}
-              onError={() => {
-                console.error("Video failed to load:", url);
-                setHasError(true);
-              }}
-              onLoadedData={() => {
-                console.log("Video loaded successfully:", url);
-                setHasError(false);
-              }}
               sx={{
                 maxWidth: "100%",
                 maxHeight: "85vh",
                 width: "auto",
                 height: "auto",
-                borderRadius: 1,
-                outline: "none",
-                cursor: "pointer",
-                display: "block",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              Your browser does not support the video tag.
+              <video
+                src={url}
+                controls
+                autoPlay
+                preload="metadata"
+                playsInline
+                onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                  console.error("Video failed to load:", url, e);
+                  setHasError(true);
+                }}
+                onLoadedData={() => {
+                  console.log("Video loaded successfully:", url);
+                  setHasError(false);
+                }}
+                onLoadStart={() => {
+                  console.log("Video loading started:", url);
+                  setHasError(false);
+                }}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "85vh",
+                  width: "auto",
+                  height: "auto",
+                  borderRadius: "8px",
+                  outline: "none",
+                  cursor: "pointer",
+                  display: "block",
+                }}
+              >
+                Your browser does not support the video tag.
+              </video>
             </Box>
           )}
         </Box>

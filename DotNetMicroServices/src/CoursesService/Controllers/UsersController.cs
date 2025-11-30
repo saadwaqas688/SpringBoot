@@ -12,33 +12,65 @@ public class UsersController : ControllerBase
     private readonly IUserCourseRepository _userCourseRepository;
     private readonly IUserLessonProgressRepository _lessonProgressRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ICourseRepository _courseRepository;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
         IUserCourseRepository userCourseRepository,
         IUserLessonProgressRepository lessonProgressRepository,
         IUserRepository userRepository,
+        ICourseRepository courseRepository,
         ILogger<UsersController> logger)
     {
         _userCourseRepository = userCourseRepository;
         _lessonProgressRepository = lessonProgressRepository;
         _userRepository = userRepository;
+        _courseRepository = courseRepository;
         _logger = logger;
     }
 
     [HttpGet("{userId}/courses")]
-    public async Task<ActionResult<ApiResponse<List<UserCourse>>>> GetUserCourses(string userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<ActionResult<ApiResponse<List<object>>>> GetUserCourses(string userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
-            var courses = await _userCourseRepository.GetByUserIdAsync(userId);
+            var userCourses = await _userCourseRepository.GetByUserIdAsync(userId);
+            var courseIds = userCourses.Select(uc => uc.CourseId).ToList();
+            
+            // Get full course details for each courseId
+            var courses = new List<object>();
+            
+            foreach (var courseId in courseIds)
+            {
+                var course = await _courseRepository.GetByIdAsync(courseId);
+                if (course != null)
+                {
+                    // Combine course data with user course progress data
+                    var userCourse = userCourses.FirstOrDefault(uc => uc.CourseId == courseId);
+                    courses.Add(new
+                    {
+                        Id = course.Id,
+                        Title = course.Title,
+                        Description = course.Description,
+                        Thumbnail = course.Thumbnail,
+                        Status = course.Status,
+                        CreatedAt = course.CreatedAt,
+                        UpdatedAt = course.UpdatedAt,
+                        Progress = userCourse?.Progress ?? 0,
+                        EnrollmentStatus = userCourse?.Status ?? "not_started",
+                        AssignedAt = userCourse?.AssignedAt,
+                        CompletedAt = userCourse?.CompletedAt
+                    });
+                }
+            }
+            
             var paged = courses.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Ok(ApiResponse<List<UserCourse>>.SuccessResponse(paged, "User courses retrieved successfully"));
+            return Ok(ApiResponse<List<object>>.SuccessResponse(paged, "User courses retrieved successfully"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving courses for user {UserId}", userId);
-            return StatusCode(500, ApiResponse<List<UserCourse>>.ErrorResponse("An error occurred while retrieving courses"));
+            return StatusCode(500, ApiResponse<List<object>>.ErrorResponse("An error occurred while retrieving courses"));
         }
     }
 

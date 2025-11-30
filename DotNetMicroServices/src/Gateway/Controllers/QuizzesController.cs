@@ -51,6 +51,29 @@ public class QuizzesController : ControllerBase
         var response = await _coursesGatewayService.DeleteQuizAsync(id);
         return StatusCode(response.Success ? 200 : 404, response);
     }
+
+    [HttpPost("lessons/{lessonId}/quizzes/upload")]
+    public async Task<ActionResult<ApiResponse<object>>> UploadQuizFile(
+        string lessonId,
+        IFormFile file,
+        [FromForm] int quizScore = 100)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse("No file uploaded"));
+            }
+
+            var response = await _coursesGatewayService.UploadQuizFileAsync(lessonId, file, quizScore);
+            return StatusCode(response.Success ? 200 : 400, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading quiz file through gateway");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse($"Error uploading quiz file: {ex.Message}"));
+        }
+    }
 }
 
 

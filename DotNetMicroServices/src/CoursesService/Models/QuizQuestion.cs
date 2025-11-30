@@ -21,6 +21,9 @@ public class QuizQuestion
 
     [BsonElement("order")]
     public int Order { get; set; }
+
+    [BsonElement("type")]
+    public string Type { get; set; } = "quiz";
 }
 
 public class QuizOption

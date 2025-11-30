@@ -42,6 +42,7 @@ public class UserAccountMessageHandler
                 RabbitMQConstants.UserAccount.SignIn => await HandleSignIn(messageJson),
                 RabbitMQConstants.UserAccount.UpdateProfile => await HandleUpdateProfile(messageJson),
                 RabbitMQConstants.UserAccount.GetCurrentUser => await HandleGetCurrentUser(messageJson),
+                RabbitMQConstants.UserAccount.GetAllUsers => await HandleGetAllUsers(messageJson),
                 RabbitMQConstants.UserAccount.RefreshToken => await HandleRefreshToken(messageJson),
                 RabbitMQConstants.UserAccount.ForgotPassword => await HandleForgotPassword(messageJson),
                 RabbitMQConstants.UserAccount.ResetPassword => await HandleResetPassword(messageJson),
@@ -98,7 +99,7 @@ public class UserAccountMessageHandler
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = createdUser.Id,
+                    Id = createdUser.Id ?? string.Empty,
                     Name = createdUser.Name,
                     Email = createdUser.Email,
                     Image = createdUser.Image,
@@ -146,7 +147,7 @@ public class UserAccountMessageHandler
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = user.Id,
+                    Id = user.Id ?? string.Empty,
                     Name = user.Name,
                     Email = user.Email,
                     Image = user.Image,
@@ -181,14 +182,14 @@ public class UserAccountMessageHandler
                 return ApiResponse<UserInfoDto>.ErrorResponse("Invalid token");
             }
 
-            var user = await _userAccountService.GetUserByIdAsync(userId.Value);
+            var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
                 return ApiResponse<UserInfoDto>.ErrorResponse("User not found");
             }
 
             // Update user profile
-            var result = await _userAccountService.UpdateUserAsync(userId.Value, user, request.Dto);
+            var result = await _userAccountService.UpdateUserAsync(userId, user, request.Dto);
             if (result == null)
             {
                 return ApiResponse<UserInfoDto>.ErrorResponse("User not found");
@@ -230,7 +231,7 @@ public class UserAccountMessageHandler
                 return ApiResponse<UserInfoDto>.ErrorResponse("Invalid token");
             }
 
-            var user = await _userAccountService.GetUserByIdAsync(userId.Value);
+            var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
                 return ApiResponse<UserInfoDto>.ErrorResponse("User not found");
@@ -238,7 +239,7 @@ public class UserAccountMessageHandler
 
             var response = new UserInfoDto
             {
-                Id = user.Id,
+                Id = user.Id ?? string.Empty,
                 Name = user.Name,
                 Email = user.Email,
                 Image = user.Image,
@@ -254,7 +255,7 @@ public class UserAccountMessageHandler
         }
     }
 
-    private Guid? ExtractUserIdFromToken(string token)
+    private string? ExtractUserIdFromToken(string token)
     {
         try
         {
@@ -262,9 +263,9 @@ public class UserAccountMessageHandler
             var jsonToken = handler.ReadJwtToken(token);
             var userIdClaim = jsonToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
             
-            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var userId))
+            if (userIdClaim != null && !string.IsNullOrEmpty(userIdClaim.Value))
             {
-                return userId;
+                return userIdClaim.Value;
             }
             return null;
         }
@@ -286,6 +287,52 @@ public class UserAccountMessageHandler
         public string? Token { get; set; }
     }
 
+    private class GetAllUsersRequest
+    {
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 10;
+        public string? SearchTerm { get; set; }
+    }
+
+    private async Task<object> HandleGetAllUsers(string messageJson)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<GetAllUsersRequest>(messageJson, _jsonOptions);
+            var page = request?.Page ?? 1;
+            var pageSize = request?.PageSize ?? 10;
+            var searchTerm = request?.SearchTerm;
+
+            var pagedUsers = await _userAccountService.GetAllUsersAsync(page, pageSize, searchTerm);
+
+            var userDtos = pagedUsers.Items.Select(u => new UserInfoDto
+            {
+                Id = u.Id ?? string.Empty,
+                Name = u.Name,
+                Email = u.Email,
+                Image = u.Image,
+                Role = u.Role
+            }).ToList();
+
+            var pagedResponse = new PagedResponse<UserInfoDto>
+            {
+                Items = userDtos,
+                PageNumber = pagedUsers.PageNumber,
+                PageSize = pagedUsers.PageSize,
+                TotalCount = pagedUsers.TotalCount
+                // TotalPages, HasPreviousPage, and HasNextPage are computed properties
+                // and will be automatically calculated from the above values
+            };
+
+            return ApiResponse<PagedResponse<UserInfoDto>>.SuccessResponse(pagedResponse, "Users retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleGetAllUsers");
+            return ApiResponse<PagedResponse<UserInfoDto>>.ErrorResponse($"Error retrieving users: {ex.Message}");
+        }
+    }
+
     private async Task<object> HandleRefreshToken(string messageJson)
     {
         try
@@ -302,7 +349,7 @@ public class UserAccountMessageHandler
                 return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid token");
             }
 
-            var user = await _userAccountService.GetUserByIdAsync(userId.Value);
+            var user = await _userAccountService.GetUserByIdAsync(userId);
             if (user == null)
             {
                 return ApiResponse<AuthResponseDto>.ErrorResponse("User not found");
@@ -314,7 +361,7 @@ public class UserAccountMessageHandler
                 Token = token,
                 User = new UserInfoDto
                 {
-                    Id = user.Id,
+                    Id = user.Id ?? string.Empty,
                     Name = user.Name,
                     Email = user.Email,
                     Image = user.Image,
@@ -372,7 +419,7 @@ public class UserAccountMessageHandler
             user.PasswordHash = _authService.HashPassword(dto.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            var updated = await _userAccountService.UpdateUserAsync(user.Id, user, null);
+            var updated = await _userAccountService.UpdateUserAsync(user.Id ?? string.Empty, user, null);
             if (updated == null)
             {
                 return ApiResponse<string>.ErrorResponse("Failed to reset password");

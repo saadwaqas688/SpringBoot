@@ -28,55 +28,85 @@ public class CoursesDbContext
 
     public async Task CreateIndexesAsync()
     {
+        // Helper method to create index safely (ignores if already exists)
+        async Task CreateIndexSafely<T>(IMongoCollection<T> collection, CreateIndexModel<T> indexModel, string indexName)
+        {
+            try
+            {
+                await collection.Indexes.CreateOneAsync(indexModel);
+            }
+            catch (MongoCommandException ex) when (ex.CodeName == "IndexOptionsConflict" || ex.CodeName == "IndexKeySpecsConflict" || ex.CodeName == "IndexAlreadyExists")
+            {
+                // Index already exists or conflicts, which is fine
+                // We can ignore this error
+            }
+            catch (MongoWriteException ex) when (ex.WriteError?.Code == 85 || ex.WriteError?.Code == 86)
+            {
+                // Index already exists (error codes 85/86)
+                // We can ignore this error
+            }
+        }
+
         // Course indexes
-        await Courses.Indexes.CreateOneAsync(
-            new CreateIndexModel<Course>(Builders<Course>.IndexKeys.Ascending(c => c.Status)));
+        await CreateIndexSafely(Courses,
+            new CreateIndexModel<Course>(Builders<Course>.IndexKeys.Ascending(c => c.Status)),
+            "Course_Status");
 
         // Lesson indexes
-        await Lessons.Indexes.CreateOneAsync(
-            new CreateIndexModel<Lesson>(Builders<Lesson>.IndexKeys.Ascending(l => l.CourseId)));
-        await Lessons.Indexes.CreateOneAsync(
+        await CreateIndexSafely(Lessons,
+            new CreateIndexModel<Lesson>(Builders<Lesson>.IndexKeys.Ascending(l => l.CourseId)),
+            "Lesson_CourseId");
+        await CreateIndexSafely(Lessons,
             new CreateIndexModel<Lesson>(Builders<Lesson>.IndexKeys.Combine(
                 Builders<Lesson>.IndexKeys.Ascending(l => l.CourseId),
-                Builders<Lesson>.IndexKeys.Ascending(l => l.Order))));
+                Builders<Lesson>.IndexKeys.Ascending(l => l.Order))),
+            "Lesson_CourseId_Order");
 
         // Slide indexes
-        await StandardSlides.Indexes.CreateOneAsync(
-            new CreateIndexModel<StandardSlide>(Builders<StandardSlide>.IndexKeys.Ascending(s => s.LessonId)));
+        await CreateIndexSafely(StandardSlides,
+            new CreateIndexModel<StandardSlide>(Builders<StandardSlide>.IndexKeys.Ascending(s => s.LessonId)),
+            "StandardSlide_LessonId");
 
         // Discussion indexes
-        await DiscussionPosts.Indexes.CreateOneAsync(
-            new CreateIndexModel<DiscussionPost>(Builders<DiscussionPost>.IndexKeys.Ascending(d => d.LessonId)));
-        await DiscussionPosts.Indexes.CreateOneAsync(
-            new CreateIndexModel<DiscussionPost>(Builders<DiscussionPost>.IndexKeys.Ascending(d => d.ParentPostId)));
+        await CreateIndexSafely(DiscussionPosts,
+            new CreateIndexModel<DiscussionPost>(Builders<DiscussionPost>.IndexKeys.Ascending(d => d.LessonId)),
+            "DiscussionPost_LessonId");
+        await CreateIndexSafely(DiscussionPosts,
+            new CreateIndexModel<DiscussionPost>(Builders<DiscussionPost>.IndexKeys.Ascending(d => d.ParentPostId)),
+            "DiscussionPost_ParentPostId");
 
         // Quiz indexes
-        await QuizQuestions.Indexes.CreateOneAsync(
-            new CreateIndexModel<QuizQuestion>(Builders<QuizQuestion>.IndexKeys.Ascending(q => q.QuizId)));
+        await CreateIndexSafely(QuizQuestions,
+            new CreateIndexModel<QuizQuestion>(Builders<QuizQuestion>.IndexKeys.Ascending(q => q.QuizId)),
+            "QuizQuestion_QuizId");
 
         // User Course indexes
-        await UserCourses.Indexes.CreateOneAsync(
+        await CreateIndexSafely(UserCourses,
             new CreateIndexModel<UserCourse>(Builders<UserCourse>.IndexKeys.Combine(
                 Builders<UserCourse>.IndexKeys.Ascending(u => u.UserId),
                 Builders<UserCourse>.IndexKeys.Ascending(u => u.CourseId)),
-            new CreateIndexOptions { Unique = true }));
+            new CreateIndexOptions { Unique = true }),
+            "UserCourse_UserId_CourseId");
 
         // Progress indexes
-        await UserLessonProgress.Indexes.CreateOneAsync(
+        await CreateIndexSafely(UserLessonProgress,
             new CreateIndexModel<UserLessonProgress>(Builders<UserLessonProgress>.IndexKeys.Combine(
                 Builders<UserLessonProgress>.IndexKeys.Ascending(u => u.UserId),
                 Builders<UserLessonProgress>.IndexKeys.Ascending(u => u.LessonId)),
-            new CreateIndexOptions { Unique = true }));
+            new CreateIndexOptions { Unique = true }),
+            "UserLessonProgress_UserId_LessonId");
 
-        await UserSlideProgress.Indexes.CreateOneAsync(
+        await CreateIndexSafely(UserSlideProgress,
             new CreateIndexModel<UserSlideProgress>(Builders<UserSlideProgress>.IndexKeys.Combine(
                 Builders<UserSlideProgress>.IndexKeys.Ascending(u => u.UserId),
                 Builders<UserSlideProgress>.IndexKeys.Ascending(u => u.SlideId)),
-            new CreateIndexOptions { Unique = true }));
+            new CreateIndexOptions { Unique = true }),
+            "UserSlideProgress_UserId_SlideId");
 
         // Quiz attempt indexes
-        await UserQuizAnswers.Indexes.CreateOneAsync(
-            new CreateIndexModel<UserQuizAnswer>(Builders<UserQuizAnswer>.IndexKeys.Ascending(a => a.AttemptId)));
+        await CreateIndexSafely(UserQuizAnswers,
+            new CreateIndexModel<UserQuizAnswer>(Builders<UserQuizAnswer>.IndexKeys.Ascending(a => a.AttemptId)),
+            "UserQuizAnswer_AttemptId");
     }
 }
 

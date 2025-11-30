@@ -39,3 +39,37 @@ a {
   }
 }
 
+/* Responsive utilities */
+@media (max-width: 600px) {
+  .MuiDialog-paper {
+    margin: 16px !important;
+    max-width: calc(100% - 32px) !important;
+  }
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 960px) {
+  body {
+    overflow-x: hidden;
+  }
+  
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Smooth transitions for mobile panels */
+@media (max-width: 960px) {
+  .MuiPaper-root {
+    transition: transform 0.3s ease-in-out;
+  }
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 960px) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+

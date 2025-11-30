@@ -81,6 +81,7 @@ export default function AssignUsersModal({
   courseId,
 }: AssignUsersModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [assignmentType, setAssignmentType] = useState<"all" | "selected">(
     "selected"
@@ -89,6 +90,16 @@ export default function AssignUsersModal({
   const [tabValue, setTabValue] = useState(0);
   const pageSize = 10;
 
+  // Debounce search term with 5 second delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 5000); // 5 seconds debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const {
     data: usersData,
     isLoading,
@@ -96,7 +107,7 @@ export default function AssignUsersModal({
   } = useGetAllUsersQuery({
     page: currentPage,
     pageSize,
-    searchTerm: searchTerm || undefined,
+    searchTerm: debouncedSearchTerm || undefined,
   });
 
   const [assignUsers, { isLoading: isAssigning }] = useAssignUserMutation();
@@ -143,26 +154,53 @@ export default function AssignUsersModal({
           alert("Please select at least one user");
           return;
         }
-        // Assign each user individually
-        // The API expects { courseId, userId } for each assignment
-        const assignments = selectedUsers.map((userId) =>
-          assignUsers({
-            courseId,
-            userId,
-          }).unwrap()
-        );
-        await Promise.all(assignments);
+
+        // Send all selected users in a single API call
+        const result = await assignUsers({
+          courseId,
+          userIds: selectedUsers,
+        }).unwrap();
+
+        // Handle the response with detailed feedback
+        if (result.success && result.data) {
+          const {
+            assignedCount = 0,
+            alreadyAssignedCount = 0,
+            failedCount = 0,
+          } = result.data;
+
+          let message = `Successfully assigned ${assignedCount} user(s) to the course.`;
+          
+          if (alreadyAssignedCount > 0) {
+            message += `\n${alreadyAssignedCount} user(s) were already assigned.`;
+          }
+          
+          if (failedCount > 0) {
+            message += `\n${failedCount} user(s) failed to assign.`;
+          }
+
+          alert(message);
+          
+          // Only close if at least some users were assigned
+          if (assignedCount > 0) {
+            onClose();
+          }
+        } else {
+          alert(result.message || "Failed to assign users. Please try again.");
+        }
       } else {
         // For "all groups" - this might need special handling
         // You may need to get all users first or use a different endpoint
         alert("Assigning to all groups is not yet implemented");
         return;
       }
-      alert("Users assigned successfully!");
-      onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to assign users:", error);
-      alert("Failed to assign users. Please try again.");
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to assign users. Please try again.";
+      alert(errorMessage);
     }
   };
 
@@ -220,7 +258,6 @@ export default function AssignUsersModal({
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
                 }}
                 InputProps={{
                   startAdornment: (
