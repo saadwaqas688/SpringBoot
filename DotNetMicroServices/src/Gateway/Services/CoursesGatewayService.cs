@@ -4,6 +4,7 @@ using Shared.Services;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using System;
 
 namespace Gateway.Services;
 
@@ -535,6 +536,37 @@ public class CoursesGatewayService : ICoursesGatewayService
     }
 
     // Quiz endpoints
+    public async Task<ApiResponse<PagedResponse<object>>> GetAllQuizzesAsync(int page, int pageSize)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var url = $"{_coursesServiceUrl}/api/Quizzes?page={page}&pageSize={pageSize}";
+            
+            _logger.LogInformation("Calling CoursesService to get all quizzes: {Url}", url);
+            
+            var response = await httpClient.GetAsync(url);
+            var content = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<PagedResponse<object>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                return result ?? ApiResponse<PagedResponse<object>>.ErrorResponse("Failed to parse quizzes response");
+            }
+            
+            _logger.LogWarning("Failed to get quizzes. Status: {StatusCode}, Response: {Content}", response.StatusCode, content);
+            return ApiResponse<PagedResponse<object>>.ErrorResponse($"Failed to get quizzes: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling CoursesService to get all quizzes");
+            return ApiResponse<PagedResponse<object>>.ErrorResponse("An error occurred while retrieving quizzes");
+        }
+    }
+
     public async Task<ApiResponse<object>> GetQuizByLessonAsync(string lessonId)
     {
         try
@@ -1195,6 +1227,248 @@ public class CoursesGatewayService : ICoursesGatewayService
         {
             _logger.LogError(ex, "Error uploading quiz file through gateway");
             return ApiResponse<object>.ErrorResponse($"Error uploading quiz file: {ex.Message}");
+        }
+    }
+
+    // Discussion endpoints
+    public async Task<ApiResponse<List<object>>> GetAllDiscussionsAsync(string? userId = null, string? userRole = null)
+    {
+        try
+        {
+            _logger.LogInformation("GetAllDiscussionsAsync - userId: {UserId}, userRole: {UserRole}", userId ?? "null", userRole ?? "null");
+            
+            var httpClient = _httpClientFactory.CreateClient();
+            var queryParams = new List<string>();
+            
+            if (!string.IsNullOrEmpty(userId))
+            {
+                queryParams.Add($"userId={Uri.EscapeDataString(userId)}");
+            }
+            
+            if (!string.IsNullOrEmpty(userRole))
+            {
+                queryParams.Add($"userRole={Uri.EscapeDataString(userRole)}");
+            }
+            
+            var queryString = queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
+            var url = $"{_coursesServiceUrl}/api/discussions{queryString}";
+            _logger.LogInformation("Calling CoursesService: {Url}", url);
+            
+            var response = await httpClient.GetAsync(url);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<List<object>>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<List<object>>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<List<object>>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<List<object>>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all discussions");
+            return ApiResponse<List<object>>.ErrorResponse($"An error occurred while retrieving discussions: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<List<object>>> GetPostsByDiscussionAsync(string discussionId)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetAsync($"{_coursesServiceUrl}/api/discussions/{discussionId}/posts");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<List<object>>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<List<object>>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<List<object>>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<List<object>>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting posts by discussion {DiscussionId}", discussionId);
+            return ApiResponse<List<object>>.ErrorResponse($"An error occurred while retrieving posts: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<object>> GetDiscussionByLessonAsync(string lessonId)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetAsync($"{_coursesServiceUrl}/api/lessons/{lessonId}/discussions");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            // Try to parse the response regardless of status code
+            var result = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            
+            if (result != null)
+            {
+                return result; // Return the parsed response (even if it's an error response like 404)
+            }
+            
+            // If parsing failed, return error
+            return ApiResponse<object>.ErrorResponse(response.IsSuccessStatusCode 
+                ? "Failed to parse response" 
+                : $"Request failed with status {response.StatusCode}: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting discussion by lesson");
+            return ApiResponse<object>.ErrorResponse($"An error occurred while retrieving discussion: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<object>> GetDiscussionByIdAsync(string id)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetAsync($"{_coursesServiceUrl}/api/discussions/{id}");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<object>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<object>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting discussion by id");
+            return ApiResponse<object>.ErrorResponse($"An error occurred while retrieving discussion: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<object>> CreateDiscussionAsync(object discussion)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var json = JsonSerializer.Serialize(discussion, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            
+            var response = await httpClient.PostAsync($"{_coursesServiceUrl}/api/discussions", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<object>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<object>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating discussion");
+            return ApiResponse<object>.ErrorResponse($"An error occurred while creating discussion: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<object>> UpdateDiscussionAsync(string id, object discussion)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var json = JsonSerializer.Serialize(discussion, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            
+            var response = await httpClient.PutAsync($"{_coursesServiceUrl}/api/discussions/{id}", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<object>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<object>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<object>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating discussion");
+            return ApiResponse<object>.ErrorResponse($"An error occurred while updating discussion: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteDiscussionAsync(string id)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.DeleteAsync($"{_coursesServiceUrl}/api/discussions/{id}");
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<ApiResponse<bool>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                return result ?? ApiResponse<bool>.ErrorResponse("Failed to parse response");
+            }
+            
+            var errorResult = JsonSerializer.Deserialize<ApiResponse<bool>>(responseContent, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return errorResult ?? ApiResponse<bool>.ErrorResponse($"Request failed: {responseContent}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting discussion");
+            return ApiResponse<bool>.ErrorResponse($"An error occurred while deleting discussion: {ex.Message}");
         }
     }
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
+using CoursesService.DTOs;
 using Shared.Common;
 
 namespace CoursesService.Controllers;
@@ -12,25 +13,27 @@ public class DiscussionPostsController : ControllerBase
     private readonly IDiscussionPostRepository _postRepository;
     private readonly ILogger<DiscussionPostsController> _logger;
 
-    public DiscussionPostsController(IDiscussionPostRepository postRepository, ILogger<DiscussionPostsController> logger)
+    public DiscussionPostsController(
+        IDiscussionPostRepository postRepository,
+        ILogger<DiscussionPostsController> logger)
     {
         _postRepository = postRepository;
         _logger = logger;
     }
 
     [HttpGet("lessons/{lessonId}/posts")]
-    public async Task<ActionResult<ApiResponse<List<DiscussionPost>>>> GetPostsByLesson(string lessonId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<ActionResult<ApiResponse<List<DiscussionPostWithUserDto>>>> GetPostsByLesson(string lessonId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
-            var posts = await _postRepository.GetPostsByLessonIdAsync(lessonId);
+            var posts = await _postRepository.GetPostsByLessonIdWithUsersAsync(lessonId);
             var pagedPosts = posts.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Ok(ApiResponse<List<DiscussionPost>>.SuccessResponse(pagedPosts, "Posts retrieved successfully"));
+            return Ok(ApiResponse<List<DiscussionPostWithUserDto>>.SuccessResponse(pagedPosts, "Posts retrieved successfully"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving posts for lesson {LessonId}", lessonId);
-            return StatusCode(500, ApiResponse<List<DiscussionPost>>.ErrorResponse("An error occurred while retrieving posts"));
+            return StatusCode(500, ApiResponse<List<DiscussionPostWithUserDto>>.ErrorResponse("An error occurred while retrieving posts"));
         }
     }
 
@@ -112,18 +115,18 @@ public class DiscussionPostsController : ControllerBase
     }
 
     [HttpGet("posts/{postId}/comments")]
-    public async Task<ActionResult<ApiResponse<List<DiscussionPost>>>> GetComments(string postId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<ActionResult<ApiResponse<List<DiscussionPostWithUserDto>>>> GetComments(string postId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
-            var comments = await _postRepository.GetCommentsByPostIdAsync(postId);
+            var comments = await _postRepository.GetCommentsByPostIdWithUsersAsync(postId);
             var pagedComments = comments.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Ok(ApiResponse<List<DiscussionPost>>.SuccessResponse(pagedComments, "Comments retrieved successfully"));
+            return Ok(ApiResponse<List<DiscussionPostWithUserDto>>.SuccessResponse(pagedComments, "Comments retrieved successfully"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving comments for post {PostId}", postId);
-            return StatusCode(500, ApiResponse<List<DiscussionPost>>.ErrorResponse("An error occurred while retrieving comments"));
+            return StatusCode(500, ApiResponse<List<DiscussionPostWithUserDto>>.ErrorResponse("An error occurred while retrieving comments"));
         }
     }
 }

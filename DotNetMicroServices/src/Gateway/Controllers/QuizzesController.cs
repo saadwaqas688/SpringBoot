@@ -17,6 +17,15 @@ public class QuizzesController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet("Quizzes")]
+    public async Task<ActionResult<ApiResponse<object>>> GetAllQuizzes(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var response = await _coursesGatewayService.GetAllQuizzesAsync(page, pageSize);
+        return StatusCode(response.Success ? 200 : 500, response);
+    }
+
     [HttpGet("lessons/{lessonId}/quizzes")]
     public async Task<ActionResult<ApiResponse<object>>> GetQuizByLesson(string lessonId)
     {
@@ -24,7 +33,7 @@ public class QuizzesController : ControllerBase
         return StatusCode(response.Success ? 200 : 404, response);
     }
 
-    [HttpGet("quizzes/{id}")]
+    [HttpGet("Quizzes/{id}")]
     public async Task<ActionResult<ApiResponse<object>>> GetQuizById(string id)
     {
         var response = await _coursesGatewayService.GetQuizByIdAsync(id);
@@ -75,5 +84,8 @@ public class QuizzesController : ControllerBase
         }
     }
 }
+
+
+
 
 

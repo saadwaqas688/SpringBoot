@@ -1,9 +1,65 @@
 import { baseAPI } from "./base-api";
 import { API_ENDPOINTS } from "@/constants/api-endpoints";
-import { POSTS } from "./tags";
+import { DISCUSSIONS, POSTS } from "./tags";
 
 export const discussionsAPI = baseAPI.injectEndpoints({
   endpoints: (builder) => ({
+    // Discussions (one-to-one with lesson)
+    getAllDiscussions: builder.query({
+      query: () => ({
+        url: API_ENDPOINTS.DISCUSSIONS.GET_ALL,
+        method: "GET",
+      }),
+      providesTags: [DISCUSSIONS],
+    }),
+    getDiscussionByLesson: builder.query({
+      query: (lessonId) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.GET_BY_LESSON(lessonId),
+        method: "GET",
+      }),
+      providesTags: [DISCUSSIONS],
+      // Don't throw error on 404 - discussion might not exist yet
+      transformResponse: (response: any) => response,
+      transformErrorResponse: (response: any) => response,
+    }),
+    getPostsByDiscussion: builder.query({
+      query: (discussionId) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.GET_POSTS_BY_DISCUSSION(discussionId),
+        method: "GET",
+      }),
+      providesTags: [POSTS],
+    }),
+    getDiscussionById: builder.query({
+      query: (id) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.GET_BY_ID(id),
+        method: "GET",
+      }),
+      providesTags: [DISCUSSIONS],
+    }),
+    createDiscussion: builder.mutation({
+      query: (body) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.CREATE,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [DISCUSSIONS],
+    }),
+    updateDiscussion: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.UPDATE(id),
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: [DISCUSSIONS],
+    }),
+    deleteDiscussion: builder.mutation({
+      query: (id) => ({
+        url: API_ENDPOINTS.DISCUSSIONS.DELETE(id),
+        method: "DELETE",
+      }),
+      invalidatesTags: [DISCUSSIONS],
+    }),
+    // Discussion Posts
     getAllPosts: builder.query({
       query: (params) => ({
         url: API_ENDPOINTS.POSTS.GET_ALL,
@@ -64,6 +120,15 @@ export const discussionsAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  // Discussion hooks
+  useGetAllDiscussionsQuery,
+  useGetDiscussionByLessonQuery,
+  useGetDiscussionByIdQuery,
+  useCreateDiscussionMutation,
+  useUpdateDiscussionMutation,
+  useDeleteDiscussionMutation,
+  useGetPostsByDiscussionQuery,
+  // Discussion Posts hooks
   useGetAllPostsQuery,
   useGetPostByIdQuery,
   useCreatePostMutation,
@@ -72,4 +137,3 @@ export const {
   useGetPostsByLessonQuery,
   useGetCommentsByPostQuery,
 } = discussionsAPI;
-

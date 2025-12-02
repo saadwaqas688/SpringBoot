@@ -145,3 +145,6 @@ Course cards automatically display images if `Thumbnail` field exists:
 - Gateway uses direct HTTP calls for file uploads (not RabbitMQ)
 - Image URLs are stored in MongoDB as strings in the `Thumbnail` field
 
+
+
+

@@ -42,15 +42,26 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/slides/${id}`,
     GET_BY_LESSON: (lessonId: string) => `/lessons/${lessonId}/slides`,
   },
+  // Discussion endpoints (one-to-one with lesson)
+  DISCUSSIONS: {
+    GET_ALL: "/discussions",
+    GET_BY_ID: (id: string) => `/discussions/${id}`,
+    CREATE: "/discussions",
+    UPDATE: (id: string) => `/discussions/${id}`,
+    DELETE: (id: string) => `/discussions/${id}`,
+    GET_BY_LESSON: (lessonId: string) => `/lessons/${lessonId}/discussions`,
+    GET_POSTS_BY_DISCUSSION: (discussionId: string) =>
+      `/discussions/${discussionId}/posts`,
+  },
   // Discussion Posts endpoints
   POSTS: {
-    GET_ALL: "/DiscussionPosts",
-    GET_BY_ID: (id: string) => `/DiscussionPosts/${id}`,
-    CREATE: "/DiscussionPosts",
-    UPDATE: (id: string) => `/DiscussionPosts/${id}`,
-    DELETE: (id: string) => `/DiscussionPosts/${id}`,
-    GET_BY_LESSON: (lessonId: string) => `/DiscussionPosts/lesson/${lessonId}`,
-    GET_COMMENTS: (postId: string) => `/DiscussionPosts/${postId}/comments`,
+    GET_ALL: "/posts",
+    GET_BY_ID: (id: string) => `/posts/${id}`,
+    CREATE: "/posts",
+    UPDATE: (id: string) => `/posts/${id}`,
+    DELETE: (id: string) => `/posts/${id}`,
+    GET_BY_LESSON: (lessonId: string) => `/lessons/${lessonId}/posts`,
+    GET_COMMENTS: (postId: string) => `/posts/${postId}/comments`,
   },
   // Quizzes endpoints
   QUIZZES: {

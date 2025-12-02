@@ -3,6 +3,7 @@ using CoursesService.Models;
 using CoursesService.Repositories;
 using CoursesService.Services;
 using Shared.Common;
+using System.Linq;
 
 namespace CoursesService.Controllers;
 
@@ -25,6 +26,31 @@ public class QuizzesController : ControllerBase
         _questionRepository = questionRepository;
         _fileParserService = fileParserService;
         _logger = logger;
+    }
+
+    [HttpGet("Quizzes")]
+    public async Task<ActionResult<ApiResponse<PagedResponse<object>>>> GetAllQuizzes(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        try
+        {
+            var pagedQuizzes = await _quizRepository.GetAllWithQuestionCountAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<object>>.SuccessResponse(
+                new PagedResponse<object>
+                {
+                    Items = pagedQuizzes.Items.Cast<object>().ToList(),
+                    PageNumber = pagedQuizzes.PageNumber,
+                    PageSize = pagedQuizzes.PageSize,
+                    TotalCount = pagedQuizzes.TotalCount
+                },
+                "Quizzes retrieved successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all quizzes");
+            return StatusCode(500, ApiResponse<PagedResponse<object>>.ErrorResponse("An error occurred while retrieving quizzes"));
+        }
     }
 
     [HttpGet("lessons/{lessonId}/quizzes")]

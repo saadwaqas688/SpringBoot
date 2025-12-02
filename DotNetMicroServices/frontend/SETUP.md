@@ -176,3 +176,6 @@ To extend the application:
 - Run `npm run build` to see all type errors
 - Check that all API response types match backend DTOs
 
+
+
+

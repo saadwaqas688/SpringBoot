@@ -14,6 +14,7 @@ public class CoursesMessageHandler
     private readonly ILessonRepository _lessonRepository;
     private readonly IStandardSlideRepository _slideRepository;
     private readonly IDiscussionPostRepository _postRepository;
+    private readonly IDiscussionRepository _discussionRepository;
     private readonly IQuizRepository _quizRepository;
     private readonly IQuizQuestionRepository _questionRepository;
     private readonly IUserQuizAttemptRepository _attemptRepository;
@@ -30,6 +31,7 @@ public class CoursesMessageHandler
         ILessonRepository lessonRepository,
         IStandardSlideRepository slideRepository,
         IDiscussionPostRepository postRepository,
+        IDiscussionRepository discussionRepository,
         IQuizRepository quizRepository,
         IQuizQuestionRepository questionRepository,
         IUserQuizAttemptRepository attemptRepository,
@@ -44,6 +46,7 @@ public class CoursesMessageHandler
         _lessonRepository = lessonRepository;
         _slideRepository = slideRepository;
         _postRepository = postRepository;
+        _discussionRepository = discussionRepository;
         _quizRepository = quizRepository;
         _questionRepository = questionRepository;
         _attemptRepository = attemptRepository;
@@ -408,6 +411,31 @@ public class CoursesMessageHandler
         lesson.CreatedAt = DateTime.UtcNow;
         lesson.UpdatedAt = DateTime.UtcNow;
         var created = await _lessonRepository.CreateAsync(lesson);
+
+        // Auto-create Discussion if lesson type is "discussion"
+        if (created.Id != null && 
+            created.LessonType?.ToLower() == "discussion")
+        {
+            try
+            {
+                var discussion = new Discussion
+                {
+                    LessonId = created.Id,
+                    Description = string.Empty,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _discussionRepository.CreateAsync(discussion);
+                _logger.LogInformation("Auto-created discussion for lesson {LessonId}", created.Id);
+            }
+            catch (Exception discussionEx)
+            {
+                _logger.LogError(discussionEx, "Error auto-creating discussion for lesson {LessonId}", created.Id);
+                // Don't fail the lesson creation if discussion creation fails
+                // The discussion can be created later
+            }
+        }
+
         return ApiResponse<object>.SuccessResponse(created, "Lesson created successfully");
     }
 

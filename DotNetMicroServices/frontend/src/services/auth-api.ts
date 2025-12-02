@@ -55,6 +55,14 @@ export const authAPI = baseAPI.injectEndpoints({
       }),
       providesTags: [AUTH],
     }),
+    updateProfile: builder.mutation({
+      query: (body) => ({
+        url: API_ENDPOINTS.AUTH.PROFILE,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: [AUTH],
+    }),
   }),
 });
 
@@ -66,5 +74,5 @@ export const {
   useResetPasswordMutation,
   useGetProfileQuery,
   useGetMeQuery,
+  useUpdateProfileMutation,
 } = authAPI;
-

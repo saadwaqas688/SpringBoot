@@ -13,6 +13,10 @@ public class DiscussionPost
     [BsonRepresentation(BsonType.ObjectId)]
     public string LessonId { get; set; } = string.Empty;
 
+    [BsonElement("discussionId")]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? DiscussionId { get; set; } // Optional: for discussion-type lessons
+
     [BsonElement("userId")]
     [BsonRepresentation(BsonType.ObjectId)]
     public string UserId { get; set; } = string.Empty;

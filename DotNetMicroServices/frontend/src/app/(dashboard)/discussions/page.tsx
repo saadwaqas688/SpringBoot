@@ -6,197 +6,257 @@ import {
   Typography,
   Paper,
   TextField,
+  InputAdornment,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Button,
-  Avatar,
-  Card,
-  CardContent,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
-import { Send as SendIcon } from "@mui/icons-material";
 import {
-  useGetPostsByLessonQuery,
-  useCreatePostMutation,
-} from "@/services/discussions-api";
-import styled from "styled-components";
+  Search as SearchIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+} from "@mui/icons-material";
+import { useRouter } from "next/navigation";
+import { useGetAllDiscussionsQuery } from "@/services/discussions-api";
+import Link from "next/link";
 
-const DiscussionContainer = styled(Box)`
-  display: flex;
-  gap: 2rem;
-  height: calc(100vh - 200px);
-`;
-
-const MainContent = styled(Box)`
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-`;
-
-const Sidebar = styled(Box)`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const PostCard = styled(Card)`
-  margin-bottom: 1rem;
-  background: ${(props: { isOwn?: boolean }) =>
-    props.isOwn ? "#e0e7ff" : "#f3f4f6"};
-`;
-
-const ReplyInput = styled(Box)`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  margin-top: auto;
-`;
+type SortField = "courseTitle" | "discussionTitle" | "contributions";
+type SortDirection = "asc" | "desc";
 
 export default function DiscussionsPage() {
-  const [replyText, setReplyText] = useState("");
-  const lessonId = "sample-lesson-id"; // This should come from route params or context
-  const { data: postsData, isLoading } = useGetPostsByLessonQuery(lessonId);
-  const [createPost] = useCreatePostMutation();
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const posts = postsData?.data || [];
+  const { data: discussionsData, isLoading } = useGetAllDiscussionsQuery();
+  const discussions = discussionsData?.data || [];
 
-  const handleSendReply = async () => {
-    if (!replyText.trim()) return;
+  // Filter discussions based on search term
+  const filteredDiscussions = discussions.filter((discussion: any) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      discussion.discussionTitle?.toLowerCase().includes(searchLower) ||
+      discussion.id?.toLowerCase().includes(searchLower) ||
+      discussion.courseTitle?.toLowerCase().includes(searchLower)
+    );
+  });
 
-    try {
-      await createPost({
-        lessonId,
-        content: replyText,
-        authorId: "current-user-id", // Get from auth state
-      }).unwrap();
-      setReplyText("");
-    } catch (error) {
-      console.error("Failed to create post:", error);
+  // Sort discussions
+  const sortedDiscussions = [...filteredDiscussions].sort((a: any, b: any) => {
+    if (!sortField) return 0;
+
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortField) {
+      case "courseTitle":
+        aValue = a.courseTitle || "";
+        bValue = b.courseTitle || "";
+        break;
+      case "discussionTitle":
+        aValue = a.discussionTitle || "";
+        bValue = b.discussionTitle || "";
+        break;
+      case "contributions":
+        aValue = a.contributions || 0;
+        bValue = b.contributions || 0;
+        break;
+      default:
+        return 0;
+    }
+
+    if (typeof aValue === "string") {
+      return sortDirection === "asc"
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    } else {
+      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+    }
+  });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
     }
   };
 
+  const handleViewDiscussion = (discussionId: string) => {
+    router.push(`/discussions/${discussionId}`);
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null;
+    return sortDirection === "asc" ? (
+      <ArrowUpwardIcon fontSize="small" />
+    ) : (
+      <ArrowDownwardIcon fontSize="small" />
+    );
+  };
+
   return (
-    <Box>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Facilitate {">"} Discussion
-        </Typography>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-          Discussion
-        </Typography>
-      </Box>
+    <Box sx={{ p: 3 }}>
+      {/* Breadcrumbs */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Facilitate {">"} Discussion
+      </Typography>
 
-      <DiscussionContainer>
-        <MainContent>
-          <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-            First discussion
-          </Typography>
+      {/* Page Title */}
+      <Typography
+        variant="h4"
+        component="h1"
+        sx={{ fontWeight: 700, mb: 3, color: "#6366f1" }}
+      >
+        Discussion
+      </Typography>
 
-          {isLoading ? (
-            <Typography>Loading posts...</Typography>
-          ) : (
-            <Box sx={{ flex: 1, overflowY: "auto", mb: 2 }}>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mb: 2, cursor: "pointer" }}
-              >
-                Load previous comments (2 to 3)
-              </Typography>
+      {/* Search Bar */}
+      <Paper sx={{ mb: 3, p: 2 }}>
+        <TextField
+          fullWidth
+          placeholder="Search by title or ID"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Paper>
 
-              {posts.map((post: any) => (
-                <PostCard key={post.id} isOwn={post.isOwn}>
-                  <CardContent>
-                    <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-                      <Avatar sx={{ bgcolor: "#6366f1" }}>
-                        {post.authorName?.charAt(0) || "U"}
-                      </Avatar>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 600 }}
-                        >
-                          {post.authorName || "Unknown User"}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(post.createdAt).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Typography variant="body1" sx={{ mb: 1 }}>
-                      {post.content}
+      {/* Discussions Table */}
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
+                <TableCell>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                    onClick={() => handleSort("courseTitle")}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      Courses
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 2 }}>
-                      <Button size="small" color="error">
-                        Delete
+                    <SortIcon field="courseTitle" />
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                    onClick={() => handleSort("discussionTitle")}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      Discussion Title
+                    </Typography>
+                    <SortIcon field="discussionTitle" />
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                    onClick={() => handleSort("contributions")}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      Contributions
+                    </Typography>
+                    <SortIcon field="contributions" />
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Actions
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : sortedDiscussions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography color="text.secondary">
+                      No discussions found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedDiscussions.map((discussion: any) => (
+                  <TableRow key={discussion.id} hover>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {discussion.courseTitle || "Untitled Course"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {discussion.discussionTitle || "Untitled discussion"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {discussion.contributions || 0}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleViewDiscussion(discussion.id)}
+                        sx={{
+                          backgroundColor: "#6366f1",
+                          textTransform: "none",
+                          "&:hover": {
+                            backgroundColor: "#4f46e5",
+                          },
+                        }}
+                      >
+                        View discussion
                       </Button>
-                      <Button size="small">Reply</Button>
-                      <Button size="small">More Replies...</Button>
-                    </Box>
-                  </CardContent>
-                </PostCard>
-              ))}
-            </Box>
-          )}
-
-          <ReplyInput>
-            <Avatar sx={{ bgcolor: "#6366f1" }}>U</Avatar>
-            <TextField
-              fullWidth
-              placeholder="write a reply..."
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendReply();
-                }
-              }}
-              multiline
-              maxRows={4}
-            />
-            <Button
-              variant="contained"
-              sx={{ bgcolor: "#6366f1", minWidth: 100 }}
-              onClick={handleSendReply}
-              startIcon={<SendIcon />}
-            >
-              Send
-            </Button>
-          </ReplyInput>
-        </MainContent>
-
-        <Sidebar>
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-              Discussion Prompt
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Discuss Different Business Scenarios
-            </Typography>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-              FIRST COURSE
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              First Discussion
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              4 Contributions
-            </Typography>
-            <Button
-              variant="text"
-              sx={{ color: "#6366f1", textTransform: "none" }}
-            >
-              View All Discussion
-            </Button>
-          </Paper>
-        </Sidebar>
-      </DiscussionContainer>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     </Box>
   );
 }
-

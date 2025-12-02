@@ -8,7 +8,13 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Allow case-insensitive property matching (camelCase from frontend -> PascalCase in C#)
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -31,6 +37,7 @@ builder.Services.AddHttpClient();
 // Register Gateway services
 builder.Services.AddScoped<IUserAccountGatewayService, UserAccountGatewayService>();
 builder.Services.AddScoped<ICoursesGatewayService, CoursesGatewayService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 // JWT Authentication Configuration (same as UserAccountService)
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

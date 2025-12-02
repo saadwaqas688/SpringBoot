@@ -3,6 +3,7 @@ export const TAGS = {
   COURSES: "Courses",
   LESSONS: "lessons",
   SLIDES: "Slides",
+  DISCUSSIONS: "Discussions",
   POSTS: "Posts",
   QUIZZES: "Quizzes",
   QUIZ_QUESTIONS: "QuizQuestions",
@@ -16,6 +17,7 @@ export const AUTH = TAGS.AUTH;
 export const COURSES = TAGS.COURSES;
 export const LESSONS = TAGS.LESSONS;
 export const SLIDES = TAGS.SLIDES;
+export const DISCUSSIONS = TAGS.DISCUSSIONS;
 export const POSTS = TAGS.POSTS;
 export const QUIZZES = TAGS.QUIZZES;
 export const QUIZ_QUESTIONS = TAGS.QUIZ_QUESTIONS;
@@ -23,4 +25,3 @@ export const QUIZ_ATTEMPTS = TAGS.QUIZ_ATTEMPTS;
 export const PROGRESS = TAGS.PROGRESS;
 export const USERS = TAGS.USERS;
 export const ADMIN = TAGS.ADMIN;
-

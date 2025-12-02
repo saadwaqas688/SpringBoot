@@ -13,5 +13,14 @@ public class UserInfoDto
     public string Email { get; set; } = string.Empty;
     public string? Image { get; set; }
     public string Role { get; set; } = string.Empty;
+    
+    // Optional profile fields
+    public string? Gender { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public string? MobilePhone { get; set; }
+    public string? Country { get; set; }
+    public string? State { get; set; }
+    public string? City { get; set; }
+    public string? PostalCode { get; set; }
 }
 

@@ -18,6 +18,9 @@ public class User
     [BsonElement("role")]
     public string Role { get; set; } = "student"; // "student" | "instructor" | "admin"
 
+    [BsonElement("image")]
+    public string? Image { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

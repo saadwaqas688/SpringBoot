@@ -74,3 +74,6 @@ export const {
   useDeleteSlideMutation,
   useGetSlidesByLessonQuery,
 } = slidesAPI;
+
+
+

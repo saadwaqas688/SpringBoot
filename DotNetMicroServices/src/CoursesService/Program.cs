@@ -12,6 +12,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+builder.Services.AddHttpClient();
 
 // MongoDB Configuration
 var mongoConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -52,6 +54,13 @@ builder.Services.AddScoped<IDiscussionPostRepository>(sp =>
     var context = sp.GetRequiredService<CoursesDbContext>();
     var logger = sp.GetRequiredService<ILogger<DiscussionPostRepository>>();
     return new DiscussionPostRepository(context.DiscussionPosts, logger);
+});
+
+builder.Services.AddScoped<IDiscussionRepository>(sp =>
+{
+    var context = sp.GetRequiredService<CoursesDbContext>();
+    var logger = sp.GetRequiredService<ILogger<DiscussionRepository>>();
+    return new DiscussionRepository(context.Discussions, logger);
 });
 
 builder.Services.AddScoped<IQuizRepository>(sp =>
@@ -129,6 +138,7 @@ builder.Services.AddScoped<CoursesMessageHandler>(sp =>
         sp.GetRequiredService<ILessonRepository>(),
         sp.GetRequiredService<IStandardSlideRepository>(),
         sp.GetRequiredService<IDiscussionPostRepository>(),
+        sp.GetRequiredService<IDiscussionRepository>(),
         sp.GetRequiredService<IQuizRepository>(),
         sp.GetRequiredService<IQuizQuestionRepository>(),
         sp.GetRequiredService<IUserQuizAttemptRepository>(),

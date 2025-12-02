@@ -107,6 +107,8 @@ import ContentPreviewPanel from "@/components/course/ContentPreviewPanel";
 import { CourseHeader } from "@/components/course/CourseHeader";
 import { QuizDisplay } from "@/components/course/QuizDisplay";
 import { QuizEditor } from "@/components/course/QuizEditor";
+import { DiscussionPreview } from "@/components/course/DiscussionPreview";
+import { DiscussionEditor } from "@/components/course/DiscussionEditor";
 import { SlideLibraryDialog } from "@/components/course/SlideLibraryDialog";
 import { SlidePreviewContainer } from "@/components/course/SlidePreviewContainer";
 import { SlidePropertiesPanel } from "@/components/course/SlidePropertiesPanel";
@@ -117,6 +119,7 @@ import { useCourseData } from "@/hooks/useCourseData";
 import { useLessons } from "@/hooks/useLessons";
 import { useSlides } from "@/hooks/useSlides";
 import { useQuiz } from "@/hooks/useQuiz";
+import { useDiscussion } from "@/hooks/useDiscussion";
 import { useSlideEditor } from "@/hooks/useSlideEditor";
 import { useModals } from "@/hooks/useModals";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
@@ -406,15 +409,26 @@ export default function CourseDetailPage() {
     }
     return "";
   };
-  
+
   const userRole = getUserRoleFromStorage();
   const isUserRole = userRole.toLowerCase() === "user";
-  
-  const { courseId, course, courseLoading, isPublishing, handlePublish } = useCourseData();
+
+  const { courseId, course, courseLoading, isPublishing, handlePublish } =
+    useCourseData();
   const lessons = useLessons(courseId);
   const lessonSelection = useLessonSelection();
-  const slides = useSlides(lessonSelection.selectedLessonId, lessonSelection.isQuizLesson);
-  const quiz = useQuiz(lessonSelection.selectedLessonId, lessonSelection.isQuizLesson);
+  const slides = useSlides(
+    lessonSelection.selectedLessonId,
+    lessonSelection.isQuizLesson || lessonSelection.isDiscussionLesson
+  );
+  const quiz = useQuiz(
+    lessonSelection.selectedLessonId,
+    lessonSelection.isQuizLesson
+  );
+  const discussion = useDiscussion(
+    lessonSelection.selectedLessonId,
+    lessonSelection.isDiscussionLesson
+  );
   const slideEditor = useSlideEditor();
   const modals = useModals();
   const mediaUpload = useMediaUpload();
@@ -424,7 +438,8 @@ export default function CourseDetailPage() {
   const [mobileLessonsOpen, setMobileLessonsOpen] = useState(false);
   const [mobilePropertiesOpen, setMobilePropertiesOpen] = useState(false);
   const [isLessonTypeMenuOpen, setIsLessonTypeMenuOpen] = useState(false);
-  const [lessonTypeMenuAnchor, setLessonTypeMenuAnchor] = useState<HTMLElement | null>(null);
+  const [lessonTypeMenuAnchor, setLessonTypeMenuAnchor] =
+    useState<HTMLElement | null>(null);
 
   // Set up sensors for drag and drop
   const sensors = useSensors(
@@ -442,12 +457,13 @@ export default function CourseDetailPage() {
   const handleDragEnd = lessons.handleDragEnd;
   const handleScroll = lessons.handleScroll;
 
-
   const handleLessonClick = (e: React.MouseEvent, lesson: any) => {
     e.stopPropagation();
-    const previousLessonId = lessonSelection.selectedLessonForSlides?.id || lessonSelection.selectedLessonForSlides?.Id;
+    const previousLessonId =
+      lessonSelection.selectedLessonForSlides?.id ||
+      lessonSelection.selectedLessonForSlides?.Id;
     const newLessonId = lesson.id || lesson.Id;
-    
+
     // If switching to a different lesson, reset all state
     if (previousLessonId && previousLessonId !== newLessonId) {
       // Reset slide editor state
@@ -457,26 +473,38 @@ export default function CourseDetailPage() {
       // Clear selected slide
       slides.setSelectedSlide(null);
     }
-    
+
     lessonSelection.handleLessonClick(lesson);
     if (lessonSelection.isQuizLesson) {
+      quiz.resetQuiz();
+      slides.setSelectedSlide(null);
+      discussion.resetDiscussion();
+    } else if (lessonSelection.isDiscussionLesson) {
       quiz.resetQuiz();
       slides.setSelectedSlide(null);
     } else {
       quiz.resetQuiz();
       slides.setSelectedSlide(null);
+      discussion.resetDiscussion();
     }
   };
 
   const handleConfirmDelete = async () => {
-    const deletedLessonId = lessons.selectedLesson?.id || lessons.selectedLesson?.Id;
-    const currentSelectedLessonId = lessonSelection.selectedLessonForSlides?.id || lessonSelection.selectedLessonForSlides?.Id;
-    
+    const deletedLessonId =
+      lessons.selectedLesson?.id || lessons.selectedLesson?.Id;
+    const currentSelectedLessonId =
+      lessonSelection.selectedLessonForSlides?.id ||
+      lessonSelection.selectedLessonForSlides?.Id;
+
     await lessons.handleDeleteLesson();
     modals.setIsDeleteModalOpen(false);
-    
+
     // If the deleted lesson was the currently selected lesson, clear the selection
-    if (deletedLessonId && currentSelectedLessonId && String(deletedLessonId) === String(currentSelectedLessonId)) {
+    if (
+      deletedLessonId &&
+      currentSelectedLessonId &&
+      String(deletedLessonId) === String(currentSelectedLessonId)
+    ) {
       lessonSelection.setSelectedLessonForSlides(null);
       setIsSlideEditorOpen(false);
       slides.setSelectedSlide(null);
@@ -486,51 +514,73 @@ export default function CourseDetailPage() {
   const handleOpenSlideLibrary = (lessonOverride?: any) => {
     console.log("=== handleOpenSlideLibrary CALLED ===");
     console.log("lessonOverride parameter:", lessonOverride);
-    console.log("lessonSelection.selectedLessonForSlides:", lessonSelection.selectedLessonForSlides);
+    console.log(
+      "lessonSelection.selectedLessonForSlides:",
+      lessonSelection.selectedLessonForSlides
+    );
     console.log("lessonSelection.isQuizLesson:", lessonSelection.isQuizLesson);
-    console.log("modals.isQuizUploadModalOpen (before):", modals.isQuizUploadModalOpen);
-    console.log("modals.isSlideLibraryOpen (before):", modals.isSlideLibraryOpen);
-    
+    console.log(
+      "modals.isQuizUploadModalOpen (before):",
+      modals.isQuizUploadModalOpen
+    );
+    console.log(
+      "modals.isSlideLibraryOpen (before):",
+      modals.isSlideLibraryOpen
+    );
+
     // Use provided lesson or fall back to selected lesson
-    const currentLesson = lessonOverride || lessonSelection.selectedLessonForSlides;
+    const currentLesson =
+      lessonOverride || lessonSelection.selectedLessonForSlides;
     console.log("currentLesson determined:", currentLesson);
-    
+
     if (!currentLesson) {
       console.error("ERROR: No current lesson available");
       alert("Please select a lesson first before adding a slide.");
       return;
     }
-    
+
     // For user role, don't allow opening slide library
     if (isUserRole) {
       return;
     }
-    
+
     // Ensure the lesson is selected in state if it was passed as override
-    if (lessonOverride && lessonOverride !== lessonSelection.selectedLessonForSlides) {
+    if (
+      lessonOverride &&
+      lessonOverride !== lessonSelection.selectedLessonForSlides
+    ) {
       console.log("Setting selected lesson in state:", lessonOverride);
       lessonSelection.setSelectedLessonForSlides(lessonOverride);
     }
-    
+
     // Check lesson type directly from the lesson
     const lessonType =
-      currentLesson.lessonType ||
-      currentLesson.LessonType ||
-      "standard";
+      currentLesson.lessonType || currentLesson.LessonType || "standard";
     console.log("Lesson type from currentLesson:", lessonType);
-    
+
     // If it's a quiz lesson, open quiz upload modal instead
     if (lessonType.toLowerCase() === "quiz") {
       console.log("Opening quiz upload modal");
       modals.setIsQuizUploadModalOpen(true);
-      console.log("setIsQuizUploadModalOpen called, state will update in next render");
+      console.log(
+        "setIsQuizUploadModalOpen called, state will update in next render"
+      );
       return;
     }
-    
+
+    // If it's a discussion lesson, don't open slide library
+    if (lessonType.toLowerCase() === "discussion") {
+      console.log("Discussion lesson - no slide library needed");
+      return;
+    }
+
     console.log("Opening slide library");
     modals.setIsSlideLibraryOpen(true);
     modals.setSelectedSlideTab(0);
-    console.log("modals.isSlideLibraryOpen (after):", modals.isSlideLibraryOpen);
+    console.log(
+      "modals.isSlideLibraryOpen (after):",
+      modals.isSlideLibraryOpen
+    );
   };
 
   const handleCloseSlideLibrary = () => {
@@ -542,7 +592,9 @@ export default function CourseDetailPage() {
     modals.setIsAssignModalOpen(true);
   };
 
-  const handleAddLessonClick = (buttonRef: React.RefObject<HTMLButtonElement>) => {
+  const handleAddLessonClick = (
+    buttonRef: React.RefObject<HTMLButtonElement>
+  ) => {
     if (buttonRef.current) {
       setLessonTypeMenuAnchor(buttonRef.current);
       setIsLessonTypeMenuOpen(true);
@@ -562,17 +614,16 @@ export default function CourseDetailPage() {
   const handleCreateSlide = async (slideType: string) => {
     // If no lesson is selected, try to auto-select the first lesson
     let currentLesson = lessonSelection.selectedLessonForSlides;
-    
+
     if (!currentLesson) {
       const lessonsArray = lessons.displayedLessons || [];
       if (lessonsArray.length > 0) {
-        const firstStandardLesson = lessonsArray.find(
-          (lesson: any) => {
-            const lessonType = lesson.lessonType || lesson.LessonType || "standard";
-            return lessonType.toLowerCase() !== "quiz";
-          }
-        );
-        
+        const firstStandardLesson = lessonsArray.find((lesson: any) => {
+          const lessonType =
+            lesson.lessonType || lesson.LessonType || "standard";
+          return lessonType.toLowerCase() !== "quiz";
+        });
+
         if (firstStandardLesson) {
           // Create a synthetic event for handleLessonClick
           const syntheticEvent = {
@@ -592,7 +643,7 @@ export default function CourseDetailPage() {
         return;
       }
     }
-    
+
     // Final check
     if (!currentLesson) {
       console.error("Cannot create slide: No lesson selected");
@@ -603,7 +654,8 @@ export default function CourseDetailPage() {
 
     try {
       // Use currentLesson which might be the auto-selected one
-      const selectedLesson = lessonSelection.selectedLessonForSlides || currentLesson;
+      const selectedLesson =
+        lessonSelection.selectedLessonForSlides || currentLesson;
       const lessonId = selectedLesson.id || selectedLesson.Id;
       if (!lessonId) {
         console.error("Cannot create slide: Lesson ID is missing");
@@ -665,7 +717,7 @@ export default function CourseDetailPage() {
       console.log("Creating slide with data:", slideData);
       const result = await slides.createSlide(slideData).unwrap();
       console.log("Slide created successfully:", result);
-      
+
       modals.setIsSlideLibraryOpen(false);
       await slides.refetchSlides();
 
@@ -678,7 +730,8 @@ export default function CourseDetailPage() {
         slideType === "video-collection"
       ) {
         const createdSlide = result?.data || result;
-        const selectedLesson = lessonSelection.selectedLessonForSlides || currentLesson;
+        const selectedLesson =
+          lessonSelection.selectedLessonForSlides || currentLesson;
         if (createdSlide && selectedLesson) {
           slideEditor.isInitializingSlideRef.current = true;
           slides.setSelectedSlide({
@@ -695,11 +748,13 @@ export default function CourseDetailPage() {
       }
     } catch (error: any) {
       console.error("Failed to create slide:", error);
-      const errorMessage = error?.data?.message || error?.message || "Failed to create slide. Please try again.";
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to create slide. Please try again.";
       alert(errorMessage);
     }
   };
-
 
   // Auto-save effect - debounced to 5 seconds
   React.useEffect(() => {
@@ -711,8 +766,13 @@ export default function CourseDetailPage() {
       return;
     }
 
-    const lessonId = lessonSelection.selectedLessonForSlides?.id || lessonSelection.selectedLessonForSlides?.Id;
-    slideEditor.scheduleAutoSave(slides.selectedSlide, lessonId ? String(lessonId) : undefined);
+    const lessonId =
+      lessonSelection.selectedLessonForSlides?.id ||
+      lessonSelection.selectedLessonForSlides?.Id;
+    slideEditor.scheduleAutoSave(
+      slides.selectedSlide,
+      lessonId ? String(lessonId) : undefined
+    );
 
     return () => {
       // Cleanup handled in hook
@@ -736,6 +796,31 @@ export default function CourseDetailPage() {
     lessonSelection.selectedLessonForSlides,
   ]);
 
+  // Auto-save effect for discussions - debounced to 5 seconds
+  React.useEffect(() => {
+    if (
+      !lessonSelection.isDiscussionLesson ||
+      !lessonSelection.selectedLessonForSlides
+    ) {
+      return;
+    }
+
+    if (discussion.isInitializingRef.current) {
+      return;
+    }
+
+    // Auto-save is handled in the hook via scheduleAutoSave
+    discussion.scheduleAutoSave();
+
+    return () => {
+      // Cleanup handled in hook
+    };
+  }, [
+    discussion.description,
+    lessonSelection.isDiscussionLesson,
+    lessonSelection.selectedLessonForSlides,
+    discussion.scheduleAutoSave,
+  ]);
 
   const formatDuration = lessons.formatDuration;
 
@@ -755,69 +840,77 @@ export default function CourseDetailPage() {
     slides.setSelectedSlide(slide);
     setIsSlideEditorOpen(true);
 
-    let slideType = slide.type || slide.Type || slide.slideType || slide.SlideType || "bulleted-list";
+    let slideType =
+      slide.type ||
+      slide.Type ||
+      slide.slideType ||
+      slide.SlideType ||
+      "bulleted-list";
     // Handle legacy "text" type as bulleted-list
     if (slideType === "text") {
       slideType = "bulleted-list";
     }
-    
+
     const contentObj = slide.content || slide.Content || {};
     const contentTitle = contentObj?.title || contentObj?.Title || "";
     const contentItems = contentObj?.items || contentObj?.Items || [];
 
     slideEditor.setSlideTitle(
-        contentTitle ||
-          slide.title ||
-          slide.Title ||
-          (slideType === "expandable-list"
-            ? "Expandable list"
-            : slideType === "single-image"
-            ? "Single Image"
-            : slideType === "image-collection"
-            ? "Image Collection"
-            : slideType === "single-video"
-            ? "Single Video"
-            : slideType === "video-collection"
-            ? "Video Collection"
-            : "Bulleted list")
-      );
+      contentTitle ||
+        slide.title ||
+        slide.Title ||
+        (slideType === "expandable-list"
+          ? "Expandable list"
+          : slideType === "single-image"
+          ? "Single Image"
+          : slideType === "image-collection"
+          ? "Image Collection"
+          : slideType === "single-video"
+          ? "Single Video"
+          : slideType === "video-collection"
+          ? "Video Collection"
+          : "Bulleted list")
+    );
 
-      if (slideType === "expandable-list") {
-        if (Array.isArray(contentItems) && contentItems.length > 0) {
+    if (slideType === "expandable-list") {
+      if (Array.isArray(contentItems) && contentItems.length > 0) {
         const expandedItems = contentItems.map((item: any) => {
-            // Handle both lowercase and uppercase property names
-            const textValue = item.text || item.Text || "";
-            const textParts = textValue.split("\n");
-            return {
-              title: textParts[0] || "",
-              content: textParts.slice(1).join("\n") || "",
-            };
-          });
+          // Handle both lowercase and uppercase property names
+          const textValue = item.text || item.Text || "";
+          const textParts = textValue.split("\n");
+          return {
+            title: textParts[0] || "",
+            content: textParts.slice(1).join("\n") || "",
+          };
+        });
         slideEditor.setExpandableListItems(expandedItems);
-        } else {
+      } else {
         slideEditor.setExpandableListItems([
-            { title: "Item 1", content: "Content for item 1" },
-            { title: "Item 2", content: "Content for item 2" },
-          ]);
-        }
+          { title: "Item 1", content: "Content for item 1" },
+          { title: "Item 2", content: "Content for item 2" },
+        ]);
+      }
       slideEditor.setFocusMode(false);
       slideEditor.setPromptText("Prompt Text");
       slideEditor.setDoneText("Continue");
       slideEditor.setExpandedItemIndex(null);
-      } else if (slideType === "single-image") {
-        const firstItem = contentItems[0] || {};
+    } else if (slideType === "single-image") {
+      const firstItem = contentItems[0] || {};
       slideEditor.setImageUrl(firstItem.image || firstItem.Image || "");
       slideEditor.setImageText(firstItem.text || firstItem.Text || "");
-      } else if (slideType === "image-collection") {
-        if (Array.isArray(contentItems) && contentItems.length > 0) {
+    } else if (slideType === "image-collection") {
+      if (Array.isArray(contentItems) && contentItems.length > 0) {
         const images = contentItems.map((item: any) => ({
-            url: item.image || item.Image || "",
-            text: item.text || item.Text || "",
+          url: item.image || item.Image || "",
+          text: item.text || item.Text || "",
           alt: item.text || item.Text || "",
-          }));
+        }));
         // Filter out completely empty items (no url) but keep at least one empty item for editing
-        const filteredImages = images.filter(img => img.url || img.text);
-        const finalImages = filteredImages.length > 0 ? filteredImages : [{ url: "", text: "", alt: "" }];
+        const filteredImages = images.filter((img) => img.url || img.text);
+        const finalImages =
+          filteredImages.length > 0
+            ? filteredImages
+            : [{ url: "", text: "", alt: "" }];
         slideEditor.setImageCollection(finalImages);
         // Auto-expand the first item if it's empty (new slide) so upload option is visible
         if (finalImages.length > 0 && !finalImages[0].url) {
@@ -825,27 +918,34 @@ export default function CourseDetailPage() {
         } else {
           slideEditor.setExpandedImageIndex(null);
         }
-        } else {
+      } else {
         // Initialize with one empty item so preview can render
         slideEditor.setImageCollection([{ url: "", text: "", alt: "" }]);
         // Auto-expand the first item so upload option is visible
         slideEditor.setExpandedImageIndex(0);
-        }
-      } else if (slideType === "single-video") {
-        const firstItem = contentItems[0] || {};
+      }
+    } else if (slideType === "single-video") {
+      const firstItem = contentItems[0] || {};
       slideEditor.setVideoUrl(firstItem.video || firstItem.Video || "");
       slideEditor.setVideoText(firstItem.text || firstItem.Text || "");
-      slideEditor.setVideoThumbnail(firstItem.thumbnail || firstItem.Thumbnail || "");
-      } else if (slideType === "video-collection") {
-        if (Array.isArray(contentItems) && contentItems.length > 0) {
+      slideEditor.setVideoThumbnail(
+        firstItem.thumbnail || firstItem.Thumbnail || ""
+      );
+    } else if (slideType === "video-collection") {
+      if (Array.isArray(contentItems) && contentItems.length > 0) {
         const videos = contentItems.map((item: any) => ({
-            url: item.video || item.Video || "",
-            title: item.text || item.Text || "",
-            thumbnail: item.thumbnail || item.Thumbnail || "",
-          }));
+          url: item.video || item.Video || "",
+          title: item.text || item.Text || "",
+          thumbnail: item.thumbnail || item.Thumbnail || "",
+        }));
         // Filter out completely empty items (no url) but keep at least one empty item for editing
-        const filteredVideos = videos.filter(video => video.url || video.title || video.thumbnail);
-        const finalVideos = filteredVideos.length > 0 ? filteredVideos : [{ url: "", title: "", thumbnail: "" }];
+        const filteredVideos = videos.filter(
+          (video) => video.url || video.title || video.thumbnail
+        );
+        const finalVideos =
+          filteredVideos.length > 0
+            ? filteredVideos
+            : [{ url: "", title: "", thumbnail: "" }];
         slideEditor.setVideoCollection(finalVideos);
         // Auto-expand the first item if it's empty (new slide) so upload option is visible
         if (finalVideos.length > 0 && !finalVideos[0].url) {
@@ -853,24 +953,26 @@ export default function CourseDetailPage() {
         } else {
           slideEditor.setExpandedVideoIndex(null);
         }
-        } else {
+      } else {
         // Initialize with one empty item so preview can render
         slideEditor.setVideoCollection([{ url: "", title: "", thumbnail: "" }]);
         // Auto-expand the first item so upload option is visible
         slideEditor.setExpandedVideoIndex(0);
-        }
-      } else {
-        if (Array.isArray(contentItems) && contentItems.length > 0) {
+      }
+    } else {
+      if (Array.isArray(contentItems) && contentItems.length > 0) {
         // Handle both lowercase and uppercase property names
-        const bullets = contentItems.map((item: any) => item.text || item.Text || "");
+        const bullets = contentItems.map(
+          (item: any) => item.text || item.Text || ""
+        );
         slideEditor.setBulletPoints(bullets);
-        } else {
+      } else {
         slideEditor.setBulletPoints([
-            "Has Several Points",
-            "Displays each point with a bullet",
-            "Is similar to a powerpoint slide",
-          ]);
-        }
+          "Has Several Points",
+          "Displays each point with a bullet",
+          "Is similar to a powerpoint slide",
+        ]);
+      }
       slideEditor.setDoneText("Continue");
     }
 
@@ -916,21 +1018,30 @@ export default function CourseDetailPage() {
   };
 
   const handleDeleteExpandableItem = (index: number) => {
-    const updated = slideEditor.expandableListItems.filter((_, i) => i !== index);
+    const updated = slideEditor.expandableListItems.filter(
+      (_, i) => i !== index
+    );
     slideEditor.setExpandableListItems(updated);
   };
 
   const handleToggleExpandableItem = (index: number) => {
     if (slideEditor.focusMode) {
-      slideEditor.setExpandedItemIndex(slideEditor.expandedItemIndex === index ? null : index);
+      slideEditor.setExpandedItemIndex(
+        slideEditor.expandedItemIndex === index ? null : index
+      );
     } else {
-      slideEditor.setExpandedItemIndex(slideEditor.expandedItemIndex === index ? null : index);
+      slideEditor.setExpandedItemIndex(
+        slideEditor.expandedItemIndex === index ? null : index
+      );
     }
   };
 
   const handleAddImageToCollection = () => {
     const newIndex = slideEditor.imageCollection.length;
-    slideEditor.setImageCollection([...slideEditor.imageCollection, { url: "", text: "", alt: "" }]);
+    slideEditor.setImageCollection([
+      ...slideEditor.imageCollection,
+      { url: "", text: "", alt: "" },
+    ]);
     // Auto-expand the newly added item so upload option is visible
     slideEditor.setExpandedImageIndex(newIndex);
   };
@@ -940,13 +1051,18 @@ export default function CourseDetailPage() {
     slideEditor.setImageCollection(updated);
     if (slideEditor.expandedImageIndex === index) {
       slideEditor.setExpandedImageIndex(null);
-    } else if (slideEditor.expandedImageIndex !== null && slideEditor.expandedImageIndex > index) {
+    } else if (
+      slideEditor.expandedImageIndex !== null &&
+      slideEditor.expandedImageIndex > index
+    ) {
       slideEditor.setExpandedImageIndex(slideEditor.expandedImageIndex - 1);
     }
   };
 
   const handleToggleImageDropdown = (index: number) => {
-    slideEditor.setExpandedImageIndex(slideEditor.expandedImageIndex === index ? null : index);
+    slideEditor.setExpandedImageIndex(
+      slideEditor.expandedImageIndex === index ? null : index
+    );
   };
 
   const handleImageFileUpload = async (index: number, file: File) => {
@@ -977,7 +1093,10 @@ export default function CourseDetailPage() {
 
   const handleAddVideoToCollection = () => {
     const newIndex = slideEditor.videoCollection.length;
-    slideEditor.setVideoCollection([...slideEditor.videoCollection, { url: "", title: "", thumbnail: "" }]);
+    slideEditor.setVideoCollection([
+      ...slideEditor.videoCollection,
+      { url: "", title: "", thumbnail: "" },
+    ]);
     // Auto-expand the newly added item so upload option is visible
     slideEditor.setExpandedVideoIndex(newIndex);
   };
@@ -987,13 +1106,18 @@ export default function CourseDetailPage() {
     slideEditor.setVideoCollection(updated);
     if (slideEditor.expandedVideoIndex === index) {
       slideEditor.setExpandedVideoIndex(null);
-    } else if (slideEditor.expandedVideoIndex !== null && slideEditor.expandedVideoIndex > index) {
+    } else if (
+      slideEditor.expandedVideoIndex !== null &&
+      slideEditor.expandedVideoIndex > index
+    ) {
       slideEditor.setExpandedVideoIndex(slideEditor.expandedVideoIndex - 1);
     }
   };
 
   const handleToggleVideoDropdown = (index: number) => {
-    slideEditor.setExpandedVideoIndex(slideEditor.expandedVideoIndex === index ? null : index);
+    slideEditor.setExpandedVideoIndex(
+      slideEditor.expandedVideoIndex === index ? null : index
+    );
   };
 
   const handleVideoFileUpload = async (index: number, file: File) => {
@@ -1032,18 +1156,25 @@ export default function CourseDetailPage() {
   // Helper function to get slides array
   // Auto-select first slide when standard lesson is selected and slides are loaded
   React.useEffect(() => {
-    const currentLessonId = lessonSelection.selectedLessonForSlides?.id || lessonSelection.selectedLessonForSlides?.Id;
-    
+    const currentLessonId =
+      lessonSelection.selectedLessonForSlides?.id ||
+      lessonSelection.selectedLessonForSlides?.Id;
+
     // Reset editor state when lesson changes
-    if (currentLessonId && lessonSelection.lastAutoSelectedLessonId && lessonSelection.lastAutoSelectedLessonId !== currentLessonId) {
+    if (
+      currentLessonId &&
+      lessonSelection.lastAutoSelectedLessonId &&
+      lessonSelection.lastAutoSelectedLessonId !== currentLessonId
+    ) {
       slideEditor.resetEditor();
       setIsSlideEditorOpen(false);
       slides.setSelectedSlide(null);
     }
-    
+
     if (
       currentLessonId &&
       !lessonSelection.isQuizLesson &&
+      !lessonSelection.isDiscussionLesson &&
       !slides.slidesLoading &&
       slides.slidesData &&
       !isSlideEditorOpen &&
@@ -1055,10 +1186,11 @@ export default function CourseDetailPage() {
         const slideLessonId = slide.lessonId || slide.LessonId;
         return String(slideLessonId) === String(currentLessonId);
       });
-      
+
       if (validSlides.length > 0) {
-        const sortedSlides = [...validSlides].sort((a: any, b: any) => 
-          (a.order || a.Order || 0) - (b.order || b.Order || 0)
+        const sortedSlides = [...validSlides].sort(
+          (a: any, b: any) =>
+            (a.order || a.Order || 0) - (b.order || b.Order || 0)
         );
         const firstSlide = sortedSlides[0];
         if (firstSlide) {
@@ -1068,18 +1200,31 @@ export default function CourseDetailPage() {
         }
       }
     }
-    
+
     if (!currentLessonId) {
       lessonSelection.setLastAutoSelectedLessonId(null);
       slideEditor.resetEditor();
       setIsSlideEditorOpen(false);
       slides.setSelectedSlide(null);
     }
-  }, [lessonSelection.selectedLessonForSlides?.id, lessonSelection.selectedLessonForSlides?.Id, lessonSelection.lastAutoSelectedLessonId, slides.slidesData, slides.slidesLoading, lessonSelection.isQuizLesson, isSlideEditorOpen]);
+  }, [
+    lessonSelection.selectedLessonForSlides?.id,
+    lessonSelection.selectedLessonForSlides?.Id,
+    lessonSelection.lastAutoSelectedLessonId,
+    slides.slidesData,
+    slides.slidesLoading,
+    lessonSelection.isQuizLesson,
+    isSlideEditorOpen,
+  ]);
 
   // Calculate slide type for preview - handle legacy "text" type
   const getPreviewSlideType = (slide: any) => {
-    const type = slide?.type || slide?.Type || slide?.slideType || slide?.SlideType || "bulleted-list";
+    const type =
+      slide?.type ||
+      slide?.Type ||
+      slide?.slideType ||
+      slide?.SlideType ||
+      "bulleted-list";
     // Handle legacy "text" type as bulleted-list
     return type === "text" ? "bulleted-list" : type;
   };
@@ -1087,7 +1232,7 @@ export default function CourseDetailPage() {
   const previewSlideType = slides.selectedSlide
     ? getPreviewSlideType(slides.selectedSlide)
     : "bulleted-list";
-  
+
   const previewIsSingleImage = previewSlideType === "single-image";
   const previewIsImageCollection = previewSlideType === "image-collection";
   const previewIsSingleVideo = previewSlideType === "single-video";
@@ -1097,11 +1242,13 @@ export default function CourseDetailPage() {
 
   // Navigation handlers for slides
   const handlePreviousSlide = async () => {
-    if (!slides.selectedSlide || !lessonSelection.selectedLessonForSlides) return;
+    if (!slides.selectedSlide || !lessonSelection.selectedLessonForSlides)
+      return;
     const slidesArray = slides.getSlidesArray();
     const currentIndex = slidesArray.findIndex(
       (s: any) =>
-        String(s.id || s.Id) === String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
+        String(s.id || s.Id) ===
+        String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
     );
     if (currentIndex > 0) {
       const previousSlide = slidesArray[currentIndex - 1];
@@ -1112,11 +1259,13 @@ export default function CourseDetailPage() {
   };
 
   const handleNextSlide = async () => {
-    if (!slides.selectedSlide || !lessonSelection.selectedLessonForSlides) return;
+    if (!slides.selectedSlide || !lessonSelection.selectedLessonForSlides)
+      return;
     const slidesArray = slides.getSlidesArray();
     const currentIndex = slidesArray.findIndex(
       (s: any) =>
-        String(s.id || s.Id) === String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
+        String(s.id || s.Id) ===
+        String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
     );
     if (currentIndex < slidesArray.length - 1) {
       const nextSlide = slidesArray[currentIndex + 1];
@@ -1126,9 +1275,15 @@ export default function CourseDetailPage() {
     }
   };
 
-  // If slide editor is open OR quiz lesson is selected OR (user role with selected slide), show the preview panel
+  // If slide editor is open OR quiz lesson is selected OR discussion lesson is selected OR (user role with selected slide), show the preview panel
   // For user role, show preview panel but without editor panel
-  if ((isSlideEditorOpen && slides.selectedSlide) || (lessonSelection.isQuizLesson && lessonSelection.selectedLessonForSlides) || (isUserRole && slides.selectedSlide)) {
+  if (
+    (isSlideEditorOpen && slides.selectedSlide) ||
+    (lessonSelection.isQuizLesson && lessonSelection.selectedLessonForSlides) ||
+    (lessonSelection.isDiscussionLesson &&
+      lessonSelection.selectedLessonForSlides) ||
+    (isUserRole && slides.selectedSlide)
+  ) {
     // Get the slide type - handle legacy "text" type
     // Only access slide properties if selectedSlide exists (not for quiz lessons)
     let slideType = "bulleted-list"; // default
@@ -1139,7 +1294,7 @@ export default function CourseDetailPage() {
         slides.selectedSlide.slideType ||
         slides.selectedSlide.SlideType ||
         "bulleted-list";
-      
+
       // Handle legacy "text" type as bulleted-list
       if (slideType === "text") {
         slideType = "bulleted-list";
@@ -1171,7 +1326,10 @@ export default function CourseDetailPage() {
         />
         {(() => {
           console.log("=== RENDERING QuizUploadModal (in early return) ===");
-          console.log("modals.isQuizUploadModalOpen:", modals.isQuizUploadModalOpen);
+          console.log(
+            "modals.isQuizUploadModalOpen:",
+            modals.isQuizUploadModalOpen
+          );
           const lessonIdValue =
             lessonSelection.selectedLessonForSlides?.id ||
             lessonSelection.selectedLessonForSlides?.Id ||
@@ -1206,11 +1364,11 @@ export default function CourseDetailPage() {
           onTabChange={modals.setSelectedSlideTab}
           onCreateSlide={handleCreateSlide}
         />
-        
+
         {/* Mobile Backdrop */}
         {(mobileLessonsOpen || mobilePropertiesOpen) && (
           <Box
-          sx={{
+            sx={{
               display: { xs: "block", lg: "none" },
               position: "fixed",
               top: 0,
@@ -1227,9 +1385,9 @@ export default function CourseDetailPage() {
           />
         )}
 
-          <Box
-            sx={{
-              display: "flex",
+        <Box
+          sx={{
+            display: "flex",
             flexDirection: { xs: "column", lg: "row" },
             height: { xs: "auto", lg: "calc(100vh - 100px)" },
             gap: { xs: 1, lg: 2 },
@@ -1239,7 +1397,7 @@ export default function CourseDetailPage() {
           }}
         >
           {/* Mobile Menu Button */}
-              <IconButton
+          <IconButton
             sx={{
               display: { xs: "flex", lg: "none" },
               position: "fixed",
@@ -1259,117 +1417,130 @@ export default function CourseDetailPage() {
             }}
           >
             <MenuIcon />
-              </IconButton>
+          </IconButton>
 
-        {/* Left Panel - Lessons Outline */}
-        <LessonsPanel
+          {/* Left Panel - Lessons Outline */}
+          <LessonsPanel
             key={`lessons-${lessons.displayedLessons?.length || 0}`}
-          mobileLessonsOpen={mobileLessonsOpen}
-          onCloseMobile={() => setMobileLessonsOpen(false)}
+            mobileLessonsOpen={mobileLessonsOpen}
+            onCloseMobile={() => setMobileLessonsOpen(false)}
             displayedLessons={lessons.displayedLessons || []}
             selectedLessonForSlides={lessonSelection.selectedLessonForSlides}
-          onLessonSelect={(lesson) => {
+            onLessonSelect={(lesson) => {
               lessonSelection.setSelectedLessonForSlides(lesson);
-            if (!lesson) {
-                          setIsSlideEditorOpen(false);
-                        }
-                      }}
-          onAddLessonClick={handleAddLessonClick}
+              if (!lesson) {
+                setIsSlideEditorOpen(false);
+              }
+            }}
+            onAddLessonClick={handleAddLessonClick}
             slidesData={slides.slidesData}
             selectedSlide={slides.selectedSlide}
-          onSlideClick={(slide) => {
+            onSlideClick={(slide) => {
               // For user role, don't open editor - just view
               if (isUserRole) {
                 return;
               }
-              const slideType = slide.type || slide.Type || slide.slideType || slide.SlideType;
-                                          if (
-                                            slideType === "bulleted-list" ||
-                                            slideType === "expandable-list" ||
-                                            slideType === "single-image" ||
-                                            slideType === "image-collection" ||
-                                            slideType === "single-video" ||
-                                            slideType === "video-collection" ||
-                                            !slideType
-                                          ) {
-              populateSlideEditor(slide);
-            }
-          }}
-          onOpenSlideLibrary={handleOpenSlideLibrary}
+              const slideType =
+                slide.type || slide.Type || slide.slideType || slide.SlideType;
+              if (
+                slideType === "bulleted-list" ||
+                slideType === "expandable-list" ||
+                slideType === "single-image" ||
+                slideType === "image-collection" ||
+                slideType === "single-video" ||
+                slideType === "video-collection" ||
+                !slideType
+              ) {
+                populateSlideEditor(slide);
+              }
+            }}
+            onOpenSlideLibrary={handleOpenSlideLibrary}
             isCreatingSlide={slides.isCreatingSlide}
-          onCloseSlideEditor={() => setIsSlideEditorOpen(false)}
-          editingLesson={lessons.editingLesson}
-          editTitle={lessons.editTitle}
-          setEditTitle={lessons.setEditTitle}
-          handleEditClick={lessons.handleEditClick}
-          handleSaveEdit={lessons.handleSaveEdit}
-          handleCancelEdit={lessons.handleCancelEdit}
-          handleDeleteClick={(e, lesson) => {
-            lessons.handleDeleteClick(e, lesson);
-            modals.setIsDeleteModalOpen(true);
-          }}
-          isUpdating={lessons.isUpdating}
-          isDeleting={lessons.isDeleting}
-          isUserRole={isUserRole}
-        />
+            onCloseSlideEditor={() => setIsSlideEditorOpen(false)}
+            editingLesson={lessons.editingLesson}
+            editTitle={lessons.editTitle}
+            setEditTitle={lessons.setEditTitle}
+            handleEditClick={lessons.handleEditClick}
+            handleSaveEdit={lessons.handleSaveEdit}
+            handleCancelEdit={lessons.handleCancelEdit}
+            handleDeleteClick={(e, lesson) => {
+              lessons.handleDeleteClick(e, lesson);
+              modals.setIsDeleteModalOpen(true);
+            }}
+            isUpdating={lessons.isUpdating}
+            isDeleting={lessons.isDeleting}
+            isUserRole={isUserRole}
+          />
 
-        {/* Middle Panel - Slide Preview */}
-        <Paper
-          sx={{
-            flex: 1,
-            p: { xs: 1, sm: 2, md: 3 },
-            display: "flex",
-            flexDirection: "column",
-            backgroundColor: "#f9fafb",
-            minWidth: 0, // Prevents flex item from overflowing
-            width: { xs: "100%", lg: "auto" },
-            minHeight: { xs: "calc(100vh - 200px)", lg: "auto" },
-            overflow: "hidden",
-            position: "relative",
-          }}
-        >
-          <Box
+          {/* Middle Panel - Slide Preview */}
+          <Paper
             sx={{
+              flex: 1,
+              p: { xs: 1, sm: 2, md: 3 },
               display: "flex",
-              justifyContent: "space-between",
+              flexDirection: "column",
+              backgroundColor: "#f9fafb",
+              minWidth: 0, // Prevents flex item from overflowing
+              width: { xs: "100%", lg: "auto" },
+              minHeight: { xs: "calc(100vh - 200px)", lg: "auto" },
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
                 alignItems: { xs: "flex-start", sm: "center" },
                 mb: { xs: 2, md: 3 },
                 flexDirection: { xs: "column", sm: "row" },
                 gap: { xs: 1, sm: 0 },
               }}
             >
-              <Typography 
-                variant="h5" 
-                sx={{ 
+              <Typography
+                variant="h5"
+                sx={{
                   fontWeight: 600,
                   fontSize: { xs: "1.25rem", sm: "1.5rem", md: "1.75rem" },
                   wordBreak: "break-word",
                 }}
               >
-              {lessonSelection.selectedLessonForSlides?.title ||
-                lessonSelection.selectedLessonForSlides?.Title ||
-                "Untitled Lesson"}
-            </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
-                <Typography 
-                  variant="body2" 
+                {lessonSelection.selectedLessonForSlides?.title ||
+                  lessonSelection.selectedLessonForSlides?.Title ||
+                  "Untitled Lesson"}
+              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  flexShrink: 0,
+                }}
+              >
+                <Typography
+                  variant="body2"
                   color="text.secondary"
                   sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
                 >
                   {lessonSelection.isQuizLesson && quiz.quizQuestions.length > 0
-                    ? `${quiz.currentQuestionIndex + 1}/${quiz.quizQuestions.length}`
+                    ? `${quiz.currentQuestionIndex + 1}/${
+                        quiz.quizQuestions.length
+                      }`
                     : (() => {
-                  const slidesArray = slides.getSlidesArray();
-                  const currentIndex = slidesArray.findIndex(
-                    (s: any) =>
-                      String(s.id || s.Id) ===
-                      String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
-                  );
-                  return `${currentIndex >= 0 ? currentIndex + 1 : 1}/${
-                    slidesArray.length || 1
-                  }`;
-                })()}
-              </Typography>
+                        const slidesArray = slides.getSlidesArray();
+                        const currentIndex = slidesArray.findIndex(
+                          (s: any) =>
+                            String(s.id || s.Id) ===
+                            String(
+                              slides.selectedSlide?.id ||
+                                slides.selectedSlide?.Id
+                            )
+                        );
+                        return `${currentIndex >= 0 ? currentIndex + 1 : 1}/${
+                          slidesArray.length || 1
+                        }`;
+                      })()}
+                </Typography>
                 {lessonSelection.isQuizLesson && !isUserRole && (
                   <Button
                     size="small"
@@ -1380,94 +1551,189 @@ export default function CourseDetailPage() {
                     Upload Quiz
                   </Button>
                 )}
-                <IconButton size="small" sx={{ display: { xs: "none", sm: "flex" } }}>
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
+                <IconButton
+                  size="small"
+                  sx={{ display: { xs: "none", sm: "flex" } }}
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
-          </Box>
 
-          {/* Slide Preview Content or Quiz Questions */}
-          {lessonSelection.isQuizLesson ? (
-            (() => {
-              // Debug logging
-              console.log("=== RENDER QUIZ DEBUG ===");
-              console.log("Is Quiz Lesson:", lessonSelection.isQuizLesson);
-              console.log("Quiz ID:", quiz.quizId);
-              console.log("Quiz Questions:", quiz.quizQuestions);
-              console.log("Questions Count:", quiz.quizQuestions?.length || 0);
-              console.log("Current Index:", quiz.currentQuestionIndex);
-              console.log("Quiz Loading:", quiz.quizLoading);
-              console.log("Questions Loading:", quiz.questionsLoading);
-              console.log("Quiz Error:", quiz.quizError);
-              console.log("Questions Error:", quiz.questionsError);
-              
-              // Ensure we have questions and a valid current question
-              const hasQuestions = quiz.quizQuestions && Array.isArray(quiz.quizQuestions) && quiz.quizQuestions.length > 0;
-              const currentQuestion = hasQuestions && quiz.currentQuestionIndex >= 0 && quiz.currentQuestionIndex < quiz.quizQuestions.length
-                ? quiz.quizQuestions[quiz.currentQuestionIndex]
-                : null;
-              const isLoading = quiz.quizLoading || quiz.questionsLoading;
-              
-              console.log("Has Questions:", hasQuestions);
-              console.log("Current Question:", currentQuestion);
-              console.log("Is Loading:", isLoading);
-              
-              if (hasQuestions && currentQuestion) {
-                return (
-                  <QuizDisplay
-                    question={currentQuestion}
-                    questionIndex={quiz.currentQuestionIndex}
-                    totalQuestions={quiz.quizQuestions.length}
-                    selectedAnswer={quiz.selectedAnswers[currentQuestion?.id || currentQuestion?.Id || currentQuestion?._id]}
-                    onAnswerSelect={quiz.handleAnswerSelect}
-                    onPrevious={() => quiz.handleQuestionNavigation("prev")}
-                    onNext={() => quiz.handleQuestionNavigation("next")}
-                    canGoPrevious={quiz.currentQuestionIndex > 0}
-                    canGoNext={quiz.currentQuestionIndex < quiz.quizQuestions.length - 1}
-                    isUserRole={quiz.isUserRole}
-                  />
+            {/* Slide Preview Content or Quiz Questions or Discussion */}
+            {lessonSelection.isDiscussionLesson ? (
+              <DiscussionPreview
+                description={discussion.description}
+                isLoading={discussion.discussionLoading}
+                error={discussion.discussionError}
+              />
+            ) : lessonSelection.isQuizLesson ? (
+              (() => {
+                // Debug logging
+                console.log("=== RENDER QUIZ DEBUG ===");
+                console.log("Is Quiz Lesson:", lessonSelection.isQuizLesson);
+                console.log("Quiz ID:", quiz.quizId);
+                console.log("Quiz Questions:", quiz.quizQuestions);
+                console.log(
+                  "Questions Count:",
+                  quiz.quizQuestions?.length || 0
                 );
-              } else if (isLoading) {
-                return (
-                  <Box
-                    sx={{
-                      flex: 1,
-                      backgroundColor: "white",
-                      borderRadius: 2,
-                      p: { xs: 2, sm: 3, md: 4 },
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                      minHeight: { xs: 400, md: "auto" },
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ mb: 2, textAlign: "center" }}>
-                      Loading quiz questions...
-                    </Typography>
-                  </Box>
-                );
-              } else if (!quiz.quizId) {
-                return (
-                  <Box
-                    sx={{
-                      flex: 1,
-                      backgroundColor: "white",
-                      borderRadius: 2,
-                      p: { xs: 2, sm: 3, md: 4 },
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                      minHeight: { xs: 400, md: "auto" },
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ mb: 2, textAlign: "center" }}>
-                      No quiz uploaded yet
-                    </Typography>
-                    {!isUserRole && (
+                console.log("Current Index:", quiz.currentQuestionIndex);
+                console.log("Quiz Loading:", quiz.quizLoading);
+                console.log("Questions Loading:", quiz.questionsLoading);
+                console.log("Quiz Error:", quiz.quizError);
+                console.log("Questions Error:", quiz.questionsError);
+
+                // Ensure we have questions and a valid current question
+                const hasQuestions =
+                  quiz.quizQuestions &&
+                  Array.isArray(quiz.quizQuestions) &&
+                  quiz.quizQuestions.length > 0;
+                const currentQuestion =
+                  hasQuestions &&
+                  quiz.currentQuestionIndex >= 0 &&
+                  quiz.currentQuestionIndex < quiz.quizQuestions.length
+                    ? quiz.quizQuestions[quiz.currentQuestionIndex]
+                    : null;
+                const isLoading = quiz.quizLoading || quiz.questionsLoading;
+
+                console.log("Has Questions:", hasQuestions);
+                console.log("Current Question:", currentQuestion);
+                console.log("Is Loading:", isLoading);
+
+                if (hasQuestions && currentQuestion) {
+                  return (
+                    <QuizDisplay
+                      question={currentQuestion}
+                      questionIndex={quiz.currentQuestionIndex}
+                      totalQuestions={quiz.quizQuestions.length}
+                      selectedAnswer={
+                        quiz.selectedAnswers[
+                          currentQuestion?.id ||
+                            currentQuestion?.Id ||
+                            currentQuestion?._id
+                        ]
+                      }
+                      onAnswerSelect={quiz.handleAnswerSelect}
+                      onPrevious={() => quiz.handleQuestionNavigation("prev")}
+                      onNext={() => quiz.handleQuestionNavigation("next")}
+                      canGoPrevious={quiz.currentQuestionIndex > 0}
+                      canGoNext={
+                        quiz.currentQuestionIndex <
+                        quiz.quizQuestions.length - 1
+                      }
+                      isUserRole={quiz.isUserRole}
+                    />
+                  );
+                } else if (isLoading) {
+                  return (
+                    <Box
+                      sx={{
+                        flex: 1,
+                        backgroundColor: "white",
+                        borderRadius: 2,
+                        p: { xs: 2, sm: 3, md: 4 },
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        minHeight: { xs: 400, md: "auto" },
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ mb: 2, textAlign: "center" }}
+                      >
+                        Loading quiz questions...
+                      </Typography>
+                    </Box>
+                  );
+                } else if (!quiz.quizId) {
+                  return (
+                    <Box
+                      sx={{
+                        flex: 1,
+                        backgroundColor: "white",
+                        borderRadius: 2,
+                        p: { xs: 2, sm: 3, md: 4 },
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        minHeight: { xs: 400, md: "auto" },
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ mb: 2, textAlign: "center" }}
+                      >
+                        No quiz uploaded yet
+                      </Typography>
+                      {!isUserRole && (
+                        <Button
+                          variant="contained"
+                          onClick={() => modals.setIsQuizUploadModalOpen(true)}
+                          sx={{
+                            bgcolor: "#6366f1",
+                            textTransform: "none",
+                            "&:hover": {
+                              bgcolor: "#4f46e5",
+                            },
+                          }}
+                        >
+                          Upload Quiz File
+                        </Button>
+                      )}
+                    </Box>
+                  );
+                } else {
+                  return (
+                    <Box
+                      sx={{
+                        flex: 1,
+                        backgroundColor: "white",
+                        borderRadius: 2,
+                        p: { xs: 2, sm: 3, md: 4 },
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        minHeight: { xs: 400, md: "auto" },
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ mb: 2, textAlign: "center" }}
+                      >
+                        No questions found in this quiz
+                      </Typography>
+                      {quiz.quizError && (
+                        <Typography
+                          variant="body2"
+                          color="error"
+                          sx={{ mb: 2 }}
+                        >
+                          Error:{" "}
+                          {"message" in quiz.quizError
+                            ? quiz.quizError.message
+                            : "Failed to load quiz"}
+                        </Typography>
+                      )}
+                      {quiz.questionsError && (
+                        <Typography
+                          variant="body2"
+                          color="error"
+                          sx={{ mb: 2 }}
+                        >
+                          Error:{" "}
+                          {"message" in quiz.questionsError
+                            ? quiz.questionsError.message
+                            : "Failed to load questions"}
+                        </Typography>
+                      )}
                       <Button
                         variant="contained"
                         onClick={() => modals.setIsQuizUploadModalOpen(true)}
@@ -1481,234 +1747,227 @@ export default function CourseDetailPage() {
                       >
                         Upload Quiz File
                       </Button>
-                    )}
-                  </Box>
-                );
-              } else {
-                return (
-                  <Box
-                    sx={{
-                      flex: 1,
-                      backgroundColor: "white",
-                      borderRadius: 2,
-                      p: { xs: 2, sm: 3, md: 4 },
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                      minHeight: { xs: 400, md: "auto" },
-                    }}
-                  >
-                    <Typography variant="h6" sx={{ mb: 2, textAlign: "center" }}>
-                      No questions found in this quiz
-                    </Typography>
-                    {quiz.quizError && (
-                      <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-                        Error: {"message" in quiz.quizError ? quiz.quizError.message : "Failed to load quiz"}
-                      </Typography>
-                    )}
-                    {quiz.questionsError && (
-                      <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-                        Error: {"message" in quiz.questionsError ? quiz.questionsError.message : "Failed to load questions"}
-                      </Typography>
-                    )}
-                    <Button
-                      variant="contained"
-                      onClick={() => modals.setIsQuizUploadModalOpen(true)}
-                      sx={{
-                        bgcolor: "#6366f1",
-                        textTransform: "none",
-                        "&:hover": {
-                          bgcolor: "#4f46e5",
-                        },
-                      }}
-                    >
-                      Upload Quiz File
-                    </Button>
-                  </Box>
-                );
-              }
-            })()
-          ) : (
-            <SlidePreviewContainer
-              selectedSlide={slides.selectedSlide}
-              slideTitle={slideEditor.slideTitle}
-              slideType={previewSlideType}
-              imageUrl={slideEditor.imageUrl}
-              imageText={slideEditor.imageText}
-              imageCollection={slideEditor.imageCollection}
-              videoUrl={slideEditor.videoUrl}
-              videoText={slideEditor.videoText}
-              videoThumbnail={slideEditor.videoThumbnail}
-              videoCollection={slideEditor.videoCollection}
-              bulletPoints={slideEditor.bulletPoints}
-              expandableListItems={slideEditor.expandableListItems}
-              focusMode={slideEditor.focusMode}
-              expandedItemIndex={slideEditor.expandedItemIndex}
-              promptText={slideEditor.promptText}
-              doneText={slideEditor.doneText}
-              slidesArray={slides.getSlidesArray()}
-              currentSlideIndex={(() => {
-                const slidesArray = slides.getSlidesArray();
-                return slidesArray.findIndex(
-                  (s: any) =>
-                    String(s.id || s.Id) ===
-                    String(slides.selectedSlide?.id || slides.selectedSlide?.Id)
-                );
-              })()}
-              onImageClick={(url) => modals.handleOpenPreview(url, "image")}
-              onVideoClick={(url) => modals.handleOpenPreview(url, "video")}
-              onToggleExpandableItem={handleToggleExpandableItem}
-              onPreviousSlide={handlePreviousSlide}
-              onNextSlide={handleNextSlide}
-            />
-          )}
-        </Paper>
-
-        {/* Mobile Properties Toggle Button */}
-        <MobilePropertiesButton
-          onClick={() => {
-            setMobilePropertiesOpen(!mobilePropertiesOpen);
-            if (mobileLessonsOpen) setMobileLessonsOpen(false);
-          }}
-        />
-
-        {/* Right Panel - Properties Editor or Quiz Editor (hidden for user role) */}
-        {!isUserRole && (
-          <>
-            {lessonSelection.isQuizLesson && quiz.quizId ? (
-              <QuizEditor
-                quizQuestions={quiz.quizQuestions}
-                quizId={quiz.quizId}
-                currentQuestionIndex={quiz.currentQuestionIndex}
-                onQuestionUpdated={() => {
-                  // Refetch quiz questions after update
-                  quiz.refetchQuestions();
-                }}
-                onQuestionDeleted={() => {
-                  // Refetch quiz questions after delete
-                  quiz.refetchQuestions();
-                }}
-                onQuestionNavigation={quiz.handleQuestionNavigation}
-                mobilePropertiesOpen={mobilePropertiesOpen}
-                onCloseMobile={() => setMobilePropertiesOpen(false)}
-              />
+                    </Box>
+                  );
+                }
+              })()
             ) : (
-              <SlidePropertiesPanel
-            mobilePropertiesOpen={mobilePropertiesOpen}
-            onCloseMobile={() => setMobilePropertiesOpen(false)}
-          slideTitle={slideEditor.slideTitle}
-          slideType={slideType}
-          imageUrl={slideEditor.imageUrl}
-          imageText={slideEditor.imageText}
-          imageCollection={slideEditor.imageCollection}
-          expandedImageIndex={slideEditor.expandedImageIndex}
-          videoUrl={slideEditor.videoUrl}
-          videoText={slideEditor.videoText}
-          videoThumbnail={slideEditor.videoThumbnail}
-          videoCollection={slideEditor.videoCollection}
-          expandedVideoIndex={slideEditor.expandedVideoIndex}
-          bulletPoints={slideEditor.bulletPoints}
-          doneText={slideEditor.doneText}
-          expandableListItems={slideEditor.expandableListItems}
-          focusMode={slideEditor.focusMode}
-          promptText={slideEditor.promptText}
-          isListExpanded={slideEditor.isListExpanded}
-          isNarrationExpanded={slideEditor.isNarrationExpanded}
-          onSlideTitleChange={(title) => slideEditor.setSlideTitle(title)}
-          onImageUrlChange={(url) => slideEditor.setImageUrl(url)}
-          onImageTextChange={(text) => slideEditor.setImageText(text)}
-          onAddImageToCollection={handleAddImageToCollection}
-          onRemoveImageFromCollection={handleRemoveImageFromCollection}
-          onToggleImageDropdown={handleToggleImageDropdown}
-          onUpdateImageInCollection={handleUpdateImageInCollection}
-          onImageUpload={async (file) => {
-            try {
-              const uploadedUrl = await mediaUpload.handleImageUpload(file);
-              slideEditor.setImageUrl(uploadedUrl);
-            } catch (error) {
-              console.error("Failed to upload image:", error);
-            }
-          }}
-          onImageUploadToCollection={handleImageFileUpload}
-          onVideoUrlChange={(url) => slideEditor.setVideoUrl(url)}
-          onVideoTextChange={(text) => slideEditor.setVideoText(text)}
-          onVideoThumbnailChange={(thumbnail) => slideEditor.setVideoThumbnail(thumbnail)}
-          onAddVideoToCollection={handleAddVideoToCollection}
-          onRemoveVideoFromCollection={handleRemoveVideoFromCollection}
-          onToggleVideoDropdown={handleToggleVideoDropdown}
-          onUpdateVideoInCollection={handleUpdateVideoInCollection}
-          onVideoUpload={async (file) => {
-            try {
-              const uploadedUrl = await mediaUpload.handleVideoUpload(file);
-              slideEditor.setVideoUrl(uploadedUrl);
-            } catch (error) {
-              console.error("Failed to upload video:", error);
-            }
-          }}
-          onVideoUploadToCollection={handleVideoFileUpload}
-          onThumbnailUpload={async (file) => {
-            try {
-              const uploadedUrl = await mediaUpload.handleImageUpload(file);
-              slideEditor.setVideoThumbnail(uploadedUrl);
-            } catch (error) {
-              console.error("Failed to upload thumbnail:", error);
-            }
-          }}
-          onThumbnailUploadToCollection={async (index, file) => {
-            try {
-              const uploadedUrl = await mediaUpload.handleImageUpload(file);
-              handleUpdateVideoInCollection(index, undefined, uploadedUrl, undefined);
-            } catch (error) {
-              console.error("Failed to upload thumbnail:", error);
-            }
-          }}
-          onAddBulletPoint={handleAddBulletPoint}
-          onUpdateBulletPoint={handleUpdateBulletPoint}
-          onDeleteBulletPoint={handleDeleteBulletPoint}
-          onDoneTextChange={(text) => slideEditor.setDoneText(text)}
-          onAddExpandableItem={handleAddExpandableItem}
-          onUpdateExpandableItem={handleUpdateExpandableItem}
-          onDeleteExpandableItem={handleDeleteExpandableItem}
-          onToggleFocusMode={() => slideEditor.setFocusMode(!slideEditor.focusMode)}
-          onPromptTextChange={(text) => slideEditor.setPromptText(text)}
-          onToggleListExpanded={() => slideEditor.setIsListExpanded(!slideEditor.isListExpanded)}
-          onToggleNarrationExpanded={() => slideEditor.setIsNarrationExpanded(!slideEditor.isNarrationExpanded)}
-          isUploadingImage={mediaUpload.isUploadingImage}
-          isUploadingVideo={mediaUpload.isUploadingVideo}
-          isUploadingThumbnail={mediaUpload.isUploadingImage}
-          />
+              <SlidePreviewContainer
+                selectedSlide={slides.selectedSlide}
+                slideTitle={slideEditor.slideTitle}
+                slideType={previewSlideType}
+                imageUrl={slideEditor.imageUrl}
+                imageText={slideEditor.imageText}
+                imageCollection={slideEditor.imageCollection}
+                videoUrl={slideEditor.videoUrl}
+                videoText={slideEditor.videoText}
+                videoThumbnail={slideEditor.videoThumbnail}
+                videoCollection={slideEditor.videoCollection}
+                bulletPoints={slideEditor.bulletPoints}
+                expandableListItems={slideEditor.expandableListItems}
+                focusMode={slideEditor.focusMode}
+                expandedItemIndex={slideEditor.expandedItemIndex}
+                promptText={slideEditor.promptText}
+                doneText={slideEditor.doneText}
+                slidesArray={slides.getSlidesArray()}
+                currentSlideIndex={(() => {
+                  const slidesArray = slides.getSlidesArray();
+                  return slidesArray.findIndex(
+                    (s: any) =>
+                      String(s.id || s.Id) ===
+                      String(
+                        slides.selectedSlide?.id || slides.selectedSlide?.Id
+                      )
+                  );
+                })()}
+                onImageClick={(url) => modals.handleOpenPreview(url, "image")}
+                onVideoClick={(url) => modals.handleOpenPreview(url, "video")}
+                onToggleExpandableItem={handleToggleExpandableItem}
+                onPreviousSlide={handlePreviousSlide}
+                onNextSlide={handleNextSlide}
+              />
             )}
-          </>
-        )}
-        
-        {/* Quiz Upload Modal - Must be in early return block */}
-        {(() => {
-          console.log("=== RENDERING QuizUploadModal (in early return) ===");
-          console.log("modals.isQuizUploadModalOpen:", modals.isQuizUploadModalOpen);
-          const lessonIdValue =
-            lessonSelection.selectedLessonForSlides?.id ||
-            lessonSelection.selectedLessonForSlides?.Id ||
-            lessonSelection.selectedLessonId ||
-            "";
-          console.log("lessonIdValue:", lessonIdValue);
-          return (
-            <QuizUploadModal
-              open={modals.isQuizUploadModalOpen}
-              onClose={() => {
-                console.log("QuizUploadModal onClose called");
-                modals.setIsQuizUploadModalOpen(false);
-              }}
-              lessonId={lessonIdValue}
-              onUpload={async (file, quizScore) => {
-                console.log("QuizUploadModal onUpload called");
-                quiz.resetQuiz();
-              }}
-            />
-          );
-        })()}
-      </Box>
+          </Paper>
+
+          {/* Mobile Properties Toggle Button */}
+          <MobilePropertiesButton
+            onClick={() => {
+              setMobilePropertiesOpen(!mobilePropertiesOpen);
+              if (mobileLessonsOpen) setMobileLessonsOpen(false);
+            }}
+          />
+
+          {/* Right Panel - Properties Editor or Quiz Editor or Discussion Editor (hidden for user role) */}
+          {!isUserRole && (
+            <>
+              {lessonSelection.isDiscussionLesson ? (
+                <DiscussionEditor
+                  description={discussion.description}
+                  onDescriptionChange={discussion.setDescription}
+                  isUpdating={discussion.isUpdating || discussion.isCreating}
+                  mobilePropertiesOpen={mobilePropertiesOpen}
+                  onCloseMobile={() => setMobilePropertiesOpen(false)}
+                />
+              ) : lessonSelection.isQuizLesson && quiz.quizId ? (
+                <QuizEditor
+                  quizQuestions={quiz.quizQuestions}
+                  quizId={quiz.quizId}
+                  currentQuestionIndex={quiz.currentQuestionIndex}
+                  onQuestionUpdated={() => {
+                    // Refetch quiz questions after update
+                    quiz.refetchQuestions();
+                  }}
+                  onQuestionDeleted={() => {
+                    // Refetch quiz questions after delete
+                    quiz.refetchQuestions();
+                  }}
+                  onQuestionNavigation={quiz.handleQuestionNavigation}
+                  mobilePropertiesOpen={mobilePropertiesOpen}
+                  onCloseMobile={() => setMobilePropertiesOpen(false)}
+                />
+              ) : (
+                <SlidePropertiesPanel
+                  mobilePropertiesOpen={mobilePropertiesOpen}
+                  onCloseMobile={() => setMobilePropertiesOpen(false)}
+                  slideTitle={slideEditor.slideTitle}
+                  slideType={slideType}
+                  imageUrl={slideEditor.imageUrl}
+                  imageText={slideEditor.imageText}
+                  imageCollection={slideEditor.imageCollection}
+                  expandedImageIndex={slideEditor.expandedImageIndex}
+                  videoUrl={slideEditor.videoUrl}
+                  videoText={slideEditor.videoText}
+                  videoThumbnail={slideEditor.videoThumbnail}
+                  videoCollection={slideEditor.videoCollection}
+                  expandedVideoIndex={slideEditor.expandedVideoIndex}
+                  bulletPoints={slideEditor.bulletPoints}
+                  doneText={slideEditor.doneText}
+                  expandableListItems={slideEditor.expandableListItems}
+                  focusMode={slideEditor.focusMode}
+                  promptText={slideEditor.promptText}
+                  isListExpanded={slideEditor.isListExpanded}
+                  isNarrationExpanded={slideEditor.isNarrationExpanded}
+                  onSlideTitleChange={(title) =>
+                    slideEditor.setSlideTitle(title)
+                  }
+                  onImageUrlChange={(url) => slideEditor.setImageUrl(url)}
+                  onImageTextChange={(text) => slideEditor.setImageText(text)}
+                  onAddImageToCollection={handleAddImageToCollection}
+                  onRemoveImageFromCollection={handleRemoveImageFromCollection}
+                  onToggleImageDropdown={handleToggleImageDropdown}
+                  onUpdateImageInCollection={handleUpdateImageInCollection}
+                  onImageUpload={async (file) => {
+                    try {
+                      const uploadedUrl = await mediaUpload.handleImageUpload(
+                        file
+                      );
+                      slideEditor.setImageUrl(uploadedUrl);
+                    } catch (error) {
+                      console.error("Failed to upload image:", error);
+                    }
+                  }}
+                  onImageUploadToCollection={handleImageFileUpload}
+                  onVideoUrlChange={(url) => slideEditor.setVideoUrl(url)}
+                  onVideoTextChange={(text) => slideEditor.setVideoText(text)}
+                  onVideoThumbnailChange={(thumbnail) =>
+                    slideEditor.setVideoThumbnail(thumbnail)
+                  }
+                  onAddVideoToCollection={handleAddVideoToCollection}
+                  onRemoveVideoFromCollection={handleRemoveVideoFromCollection}
+                  onToggleVideoDropdown={handleToggleVideoDropdown}
+                  onUpdateVideoInCollection={handleUpdateVideoInCollection}
+                  onVideoUpload={async (file) => {
+                    try {
+                      const uploadedUrl = await mediaUpload.handleVideoUpload(
+                        file
+                      );
+                      slideEditor.setVideoUrl(uploadedUrl);
+                    } catch (error) {
+                      console.error("Failed to upload video:", error);
+                    }
+                  }}
+                  onVideoUploadToCollection={handleVideoFileUpload}
+                  onThumbnailUpload={async (file) => {
+                    try {
+                      const uploadedUrl = await mediaUpload.handleImageUpload(
+                        file
+                      );
+                      slideEditor.setVideoThumbnail(uploadedUrl);
+                    } catch (error) {
+                      console.error("Failed to upload thumbnail:", error);
+                    }
+                  }}
+                  onThumbnailUploadToCollection={async (index, file) => {
+                    try {
+                      const uploadedUrl = await mediaUpload.handleImageUpload(
+                        file
+                      );
+                      handleUpdateVideoInCollection(
+                        index,
+                        undefined,
+                        uploadedUrl,
+                        undefined
+                      );
+                    } catch (error) {
+                      console.error("Failed to upload thumbnail:", error);
+                    }
+                  }}
+                  onAddBulletPoint={handleAddBulletPoint}
+                  onUpdateBulletPoint={handleUpdateBulletPoint}
+                  onDeleteBulletPoint={handleDeleteBulletPoint}
+                  onDoneTextChange={(text) => slideEditor.setDoneText(text)}
+                  onAddExpandableItem={handleAddExpandableItem}
+                  onUpdateExpandableItem={handleUpdateExpandableItem}
+                  onDeleteExpandableItem={handleDeleteExpandableItem}
+                  onToggleFocusMode={() =>
+                    slideEditor.setFocusMode(!slideEditor.focusMode)
+                  }
+                  onPromptTextChange={(text) => slideEditor.setPromptText(text)}
+                  onToggleListExpanded={() =>
+                    slideEditor.setIsListExpanded(!slideEditor.isListExpanded)
+                  }
+                  onToggleNarrationExpanded={() =>
+                    slideEditor.setIsNarrationExpanded(
+                      !slideEditor.isNarrationExpanded
+                    )
+                  }
+                  isUploadingImage={mediaUpload.isUploadingImage}
+                  isUploadingVideo={mediaUpload.isUploadingVideo}
+                  isUploadingThumbnail={mediaUpload.isUploadingImage}
+                />
+              )}
+            </>
+          )}
+
+          {/* Quiz Upload Modal - Must be in early return block */}
+          {(() => {
+            console.log("=== RENDERING QuizUploadModal (in early return) ===");
+            console.log(
+              "modals.isQuizUploadModalOpen:",
+              modals.isQuizUploadModalOpen
+            );
+            const lessonIdValue =
+              lessonSelection.selectedLessonForSlides?.id ||
+              lessonSelection.selectedLessonForSlides?.Id ||
+              lessonSelection.selectedLessonId ||
+              "";
+            console.log("lessonIdValue:", lessonIdValue);
+            return (
+              <QuizUploadModal
+                open={modals.isQuizUploadModalOpen}
+                onClose={() => {
+                  console.log("QuizUploadModal onClose called");
+                  modals.setIsQuizUploadModalOpen(false);
+                }}
+                lessonId={lessonIdValue}
+                onUpload={async (file, quizScore) => {
+                  console.log("QuizUploadModal onUpload called");
+                  quiz.resetQuiz();
+                }}
+              />
+            );
+          })()}
+        </Box>
       </>
     );
   }
@@ -1752,11 +2011,18 @@ export default function CourseDetailPage() {
               if (isUserRole) {
                 slides.setSelectedSlide(slide);
                 // Populate preview data without opening editor
-                const slideType = slide.type || slide.Type || slide.slideType || slide.SlideType || "bulleted-list";
+                const slideType =
+                  slide.type ||
+                  slide.Type ||
+                  slide.slideType ||
+                  slide.SlideType ||
+                  "bulleted-list";
                 const contentObj = slide.content || slide.Content || {};
-                const contentTitle = contentObj?.title || contentObj?.Title || "";
-                const contentItems = contentObj?.items || contentObj?.Items || [];
-                
+                const contentTitle =
+                  contentObj?.title || contentObj?.Title || "";
+                const contentItems =
+                  contentObj?.items || contentObj?.Items || [];
+
                 slideEditor.setSlideTitle(
                   contentTitle ||
                     slide.title ||
@@ -1773,10 +2039,14 @@ export default function CourseDetailPage() {
                       ? "Video Collection"
                       : "Bulleted list")
                 );
-                
+
                 // Populate based on slide type
                 if (slideType === "bulleted-list") {
-                  slideEditor.setBulletPoints(contentItems.map((item: any) => item.text || item.Text || ""));
+                  slideEditor.setBulletPoints(
+                    contentItems.map(
+                      (item: any) => item.text || item.Text || ""
+                    )
+                  );
                 } else if (slideType === "expandable-list") {
                   const expandedItems = contentItems.map((item: any) => {
                     const textValue = item.text || item.Text || "";
@@ -1788,31 +2058,44 @@ export default function CourseDetailPage() {
                   });
                   slideEditor.setExpandableListItems(expandedItems);
                 } else if (slideType === "single-image") {
-                  slideEditor.setImageUrl(contentItems[0]?.image || contentItems[0]?.Image || "");
-                  slideEditor.setImageText(contentItems[0]?.text || contentItems[0]?.Text || "");
+                  slideEditor.setImageUrl(
+                    contentItems[0]?.image || contentItems[0]?.Image || ""
+                  );
+                  slideEditor.setImageText(
+                    contentItems[0]?.text || contentItems[0]?.Text || ""
+                  );
                 } else if (slideType === "image-collection") {
-                  slideEditor.setImageCollection(contentItems.map((item: any) => ({
-                    text: item.text || item.Text || "",
-                    image: item.image || item.Image || "",
-                  })));
+                  slideEditor.setImageCollection(
+                    contentItems.map((item: any) => ({
+                      text: item.text || item.Text || "",
+                      image: item.image || item.Image || "",
+                    }))
+                  );
                 } else if (slideType === "single-video") {
-                  slideEditor.setVideoUrl(contentItems[0]?.video || contentItems[0]?.Video || "");
-                  slideEditor.setVideoText(contentItems[0]?.text || contentItems[0]?.Text || "");
-                  slideEditor.setVideoThumbnail(contentItems[0]?.thumbnail || contentItems[0]?.Thumbnail || "");
+                  slideEditor.setVideoUrl(
+                    contentItems[0]?.video || contentItems[0]?.Video || ""
+                  );
+                  slideEditor.setVideoText(
+                    contentItems[0]?.text || contentItems[0]?.Text || ""
+                  );
+                  slideEditor.setVideoThumbnail(
+                    contentItems[0]?.thumbnail ||
+                      contentItems[0]?.Thumbnail ||
+                      ""
+                  );
                 } else if (slideType === "video-collection") {
-                  slideEditor.setVideoCollection(contentItems.map((item: any) => ({
-                    text: item.text || item.Text || "",
-                    video: item.video || item.Video || "",
-                    thumbnail: item.thumbnail || item.Thumbnail || "",
-                  })));
+                  slideEditor.setVideoCollection(
+                    contentItems.map((item: any) => ({
+                      text: item.text || item.Text || "",
+                      video: item.video || item.Video || "",
+                      thumbnail: item.thumbnail || item.Thumbnail || "",
+                    }))
+                  );
                 }
                 return;
               }
               const slideType =
-                slide.type ||
-                slide.Type ||
-                slide.slideType ||
-                slide.SlideType;
+                slide.type || slide.Type || slide.slideType || slide.SlideType;
               if (
                 slideType === "bulleted-list" ||
                 slideType === "expandable-list" ||
@@ -1932,8 +2215,14 @@ export default function CourseDetailPage() {
       />
       {(() => {
         console.log("=== RENDERING QuizUploadModal ===");
-        console.log("modals.isQuizUploadModalOpen:", modals.isQuizUploadModalOpen);
-        console.log("lessonSelection.selectedLessonForSlides:", lessonSelection.selectedLessonForSlides);
+        console.log(
+          "modals.isQuizUploadModalOpen:",
+          modals.isQuizUploadModalOpen
+        );
+        console.log(
+          "lessonSelection.selectedLessonForSlides:",
+          lessonSelection.selectedLessonForSlides
+        );
         const lessonIdValue =
           lessonSelection.selectedLessonForSlides?.id ||
           lessonSelection.selectedLessonForSlides?.Id ||

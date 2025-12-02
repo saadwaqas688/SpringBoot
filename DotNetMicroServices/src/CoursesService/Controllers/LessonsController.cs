@@ -11,11 +11,16 @@ namespace CoursesService.Controllers;
 public class LessonsController : ControllerBase
 {
     private readonly ILessonRepository _lessonRepository;
+    private readonly IDiscussionRepository _discussionRepository;
     private readonly ILogger<LessonsController> _logger;
 
-    public LessonsController(ILessonRepository lessonRepository, ILogger<LessonsController> logger)
+    public LessonsController(
+        ILessonRepository lessonRepository, 
+        IDiscussionRepository discussionRepository,
+        ILogger<LessonsController> logger)
     {
         _lessonRepository = lessonRepository;
+        _discussionRepository = discussionRepository;
         _logger = logger;
     }
 
@@ -62,6 +67,31 @@ public class LessonsController : ControllerBase
             lesson.CreatedAt = DateTime.UtcNow;
             lesson.UpdatedAt = DateTime.UtcNow;
             var created = await _lessonRepository.CreateAsync(lesson);
+
+            // Auto-create Discussion if lesson type is "discussion"
+            if (created.Id != null && 
+                created.LessonType?.ToLower() == "discussion")
+            {
+                try
+                {
+                    var discussion = new Discussion
+                    {
+                        LessonId = created.Id,
+                        Description = string.Empty,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _discussionRepository.CreateAsync(discussion);
+                    _logger.LogInformation("Auto-created discussion for lesson {LessonId}", created.Id);
+                }
+                catch (Exception discussionEx)
+                {
+                    _logger.LogError(discussionEx, "Error auto-creating discussion for lesson {LessonId}", created.Id);
+                    // Don't fail the lesson creation if discussion creation fails
+                    // The discussion can be created later
+                }
+            }
+
             return CreatedAtAction(nameof(GetLessonById), new { id = created.Id },
                 ApiResponse<Lesson>.SuccessResponse(created, "Lesson created successfully"));
         }

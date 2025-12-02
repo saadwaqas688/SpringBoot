@@ -29,7 +29,7 @@ public class CoursesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<PagedResponse<Course>>>> GetAllCourses(
+    public async Task<ActionResult<ApiResponse<Shared.Common.PagedResponse<Course>>>> GetAllCourses(
         [FromQuery] int page = 1, 
         [FromQuery] int pageSize = 10)
     {

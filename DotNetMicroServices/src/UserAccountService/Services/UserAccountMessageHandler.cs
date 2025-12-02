@@ -197,11 +197,18 @@ public class UserAccountMessageHandler
 
             var response = new UserInfoDto
             {
-                Id = result.Id,
+                Id = result.Id ?? string.Empty,
                 Name = result.Name,
                 Email = result.Email,
                 Image = result.Image,
-                Role = result.Role
+                Role = result.Role,
+                Gender = result.Gender,
+                DateOfBirth = result.DateOfBirth,
+                MobilePhone = result.MobilePhone,
+                Country = result.Country,
+                State = result.State,
+                City = result.City,
+                PostalCode = result.PostalCode
             };
 
             return ApiResponse<UserInfoDto>.SuccessResponse(response, "Profile updated successfully");
@@ -243,7 +250,14 @@ public class UserAccountMessageHandler
                 Name = user.Name,
                 Email = user.Email,
                 Image = user.Image,
-                Role = user.Role
+                Role = user.Role,
+                Gender = user.Gender,
+                DateOfBirth = user.DateOfBirth,
+                MobilePhone = user.MobilePhone,
+                Country = user.Country,
+                State = user.State,
+                City = user.City,
+                PostalCode = user.PostalCode
             };
 
             return ApiResponse<UserInfoDto>.SuccessResponse(response, "User retrieved successfully");

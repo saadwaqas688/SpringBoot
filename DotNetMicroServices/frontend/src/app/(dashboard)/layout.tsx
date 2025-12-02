@@ -27,11 +27,14 @@ import {
   Notifications as NotificationsIcon,
   Menu as MenuIcon,
   ChatBubble as ChatIcon,
+  Forum as ForumIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
-import { useAppDispatch } from "@/redux-store";
+import { useAppDispatch, useAppSelector } from "@/redux-store";
 import { clearCredentials } from "@/redux-store";
 import styled from "styled-components";
+import AccountDetailsModal from "@/components/AccountDetailsModal";
+import { useGetMeQuery } from "@/services/auth-api";
 
 const drawerWidth = 280;
 
@@ -47,7 +50,7 @@ const MainContent = styled(Box)`
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
-  
+
   @media (max-width: 960px) {
     width: 100vw;
     overflow-x: hidden;
@@ -67,11 +70,11 @@ const SearchBox = styled(Box)`
   border-radius: 8px;
   padding: 8px 16px;
   width: 300px;
-  
+
   @media (max-width: 960px) {
     width: 200px;
   }
-  
+
   @media (max-width: 600px) {
     display: none;
   }
@@ -91,6 +94,7 @@ const allMenuItems = [
       { text: "Meetings", path: "/meetings" },
     ],
   },
+  { text: "Discussions", icon: ForumIcon, path: "/discussions" },
   { text: "Engage", icon: ChatIcon, path: "/engage" },
   { text: "Facilitate", icon: PeopleIcon, path: "/facilitate" },
   { text: "Insights", icon: QuizIcon, path: "/insights" },
@@ -102,6 +106,7 @@ const allMenuItems = [
 const userMenuItems = [
   { text: "Dashboard", icon: DashboardIcon, path: "/dashboard" },
   { text: "Courses", icon: FolderIcon, path: "/courses" },
+  { text: "Discussions", icon: ForumIcon, path: "/discussions" },
 ];
 
 export default function DashboardLayout({
@@ -113,24 +118,40 @@ export default function DashboardLayout({
   const dispatch = useAppDispatch();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Content"]);
-  
-  // Get user role from localStorage instead of Redux state (persists on refresh)
-  const getUserRoleFromStorage = () => {
-    if (typeof window === "undefined") return "";
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+
+  // Fetch latest user data from API
+  const { data: meData } = useGetMeQuery(undefined, {
+    skip: false, // Always fetch to get latest data
+  });
+
+  // Get user info from Redux state or localStorage
+  const userFromRedux = useAppSelector((state) => state.auth.user);
+
+  const getUserInfoFromStorage = () => {
+    if (typeof window === "undefined") return null;
     try {
       const userInfo = localStorage.getItem("user_info");
       if (userInfo) {
-        const user = JSON.parse(userInfo);
-        return user?.role || user?.Role || "";
+        return JSON.parse(userInfo);
       }
     } catch (error) {
       console.error("Error reading user info from localStorage:", error);
     }
-    return "";
+    return null;
   };
-  
-  // Filter menu items based on user role
-  const userRole = getUserRoleFromStorage();
+
+  // Get user info (prefer API data, then Redux, then localStorage)
+  const apiUser = meData?.data?.user || meData?.data;
+  const user = apiUser || userFromRedux || getUserInfoFromStorage();
+  const userName =
+    user?.name || user?.Name || user?.username || user?.Username || "User";
+  const userEmail = user?.email || user?.Email || "";
+  const userInitial = userName.charAt(0).toUpperCase();
+  const userImage = user?.image || user?.Image;
+
+  // Get user role for menu filtering
+  const userRole = user?.role || user?.Role || "";
   const isUserRole = userRole.toLowerCase() === "user";
   const menuItems = isUserRole ? userMenuItems : allMenuItems;
 
@@ -184,25 +205,27 @@ export default function DashboardLayout({
                 )}
               </ListItemButton>
             </ListItem>
-            {item.children && !isUserRole && expandedItems.includes(item.text) && (
-              <List sx={{ pl: 4 }}>
-                {item.children.map((child) => (
-                  <ListItem key={child.text} disablePadding>
-                    <ListItemButton
-                      onClick={() => router.push(child.path)}
-                      sx={{
-                        color: "rgba(255, 255, 255, 0.8)",
-                        "&:hover": {
-                          backgroundColor: "rgba(255, 255, 255, 0.1)",
-                        },
-                      }}
-                    >
-                      <ListItemText primary={`• ${child.text}`} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
+            {item.children &&
+              !isUserRole &&
+              expandedItems.includes(item.text) && (
+                <List sx={{ pl: 4 }}>
+                  {item.children.map((child) => (
+                    <ListItem key={child.text} disablePadding>
+                      <ListItemButton
+                        onClick={() => router.push(child.path)}
+                        sx={{
+                          color: "rgba(255, 255, 255, 0.8)",
+                          "&:hover": {
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                          },
+                        }}
+                      >
+                        <ListItemText primary={`• ${child.text}`} />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
           </Box>
         ))}
         <ListItem disablePadding sx={{ mt: 2 }}>
@@ -272,7 +295,12 @@ export default function DashboardLayout({
       </Box>
       <MainContent>
         <Header position="static">
-          <Toolbar sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, gap: { xs: 1, sm: 0 } }}>
+          <Toolbar
+            sx={{
+              flexWrap: { xs: "wrap", sm: "nowrap" },
+              gap: { xs: 1, sm: 0 },
+            }}
+          >
             <IconButton
               color="inherit"
               edge="start"
@@ -281,13 +309,13 @@ export default function DashboardLayout({
             >
               <MenuIcon />
             </IconButton>
-            <Typography 
-              variant="h6" 
-              component="div" 
-              sx={{ 
+            <Typography
+              variant="h6"
+              component="div"
+              sx={{
                 flexGrow: 1,
                 fontSize: { xs: "0.875rem", sm: "1.25rem" },
-                display: { xs: "none", sm: "block" }
+                display: { xs: "none", sm: "block" },
               }}
             >
               Compliance Sheet L&D
@@ -296,22 +324,72 @@ export default function DashboardLayout({
               <SearchIcon sx={{ color: "#9ca3af", mr: 1 }} />
               <InputBase placeholder="Search..." sx={{ flex: 1 }} />
             </SearchBox>
-            <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.5, sm: 1 } }}>
-              <IconButton color="inherit" sx={{ display: { xs: "none", sm: "flex" } }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.5, sm: 1 },
+              }}
+            >
+              <IconButton
+                color="inherit"
+                sx={{ display: { xs: "none", sm: "flex" } }}
+              >
                 <NotificationsIcon />
               </IconButton>
               <Typography sx={{ display: { xs: "none", md: "block" }, mr: 1 }}>
-                Welcome!
+                Welcome, {userName}!
               </Typography>
-              <Avatar sx={{ bgcolor: "#10b981", width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
-                T
-              </Avatar>
+              <IconButton
+                onClick={() => setAccountModalOpen(true)}
+                sx={{
+                  padding: 0.5,
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  },
+                }}
+              >
+                <Avatar
+                  src={userImage}
+                  sx={{
+                    bgcolor: "#10b981",
+                    width: { xs: 36, sm: 44 },
+                    height: { xs: 36, sm: 44 },
+                    cursor: "pointer",
+                    border: "2px solid #e5e7eb",
+                    "&:hover": {
+                      border: "2px solid #6366f1",
+                      boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
+                    },
+                    fontSize: { xs: "1rem", sm: "1.25rem" },
+                    fontWeight: 600,
+                  }}
+                >
+                  {userInitial}
+                </Avatar>
+              </IconButton>
             </Box>
           </Toolbar>
         </Header>
         <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>{children}</Box>
       </MainContent>
+
+      <AccountDetailsModal
+        open={accountModalOpen}
+        onClose={() => setAccountModalOpen(false)}
+        userName={userName}
+        userEmail={userEmail}
+        userImage={userImage}
+        userInitial={userInitial}
+        onMyProfileClick={() => {
+          // Navigate to profile page when implemented
+          router.push("/profile");
+        }}
+        onChangePasswordClick={() => {
+          // Navigate to change password page when implemented
+          router.push("/change-password");
+        }}
+      />
     </Box>
   );
 }
-

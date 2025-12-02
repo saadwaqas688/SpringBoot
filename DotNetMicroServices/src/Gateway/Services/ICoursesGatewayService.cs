@@ -33,6 +33,8 @@ public interface ICoursesGatewayService
     Task<ApiResponse<bool>> DeleteSlideAsync(string id);
     
     // Discussion endpoints
+    Task<ApiResponse<List<object>>> GetAllDiscussionsAsync(string? userId = null, string? userRole = null);
+    Task<ApiResponse<List<object>>> GetPostsByDiscussionAsync(string discussionId);
     Task<ApiResponse<List<object>>> GetPostsByLessonAsync(string lessonId, int page, int pageSize);
     Task<ApiResponse<object>> GetPostByIdAsync(string id);
     Task<ApiResponse<object>> CreatePostAsync(object post);
@@ -41,6 +43,7 @@ public interface ICoursesGatewayService
     Task<ApiResponse<List<object>>> GetCommentsAsync(string postId, int page, int pageSize);
     
     // Quiz endpoints
+    Task<ApiResponse<PagedResponse<object>>> GetAllQuizzesAsync(int page, int pageSize);
     Task<ApiResponse<object>> GetQuizByLessonAsync(string lessonId);
     Task<ApiResponse<object>> GetQuizByIdAsync(string id);
     Task<ApiResponse<object>> CreateQuizAsync(object quiz);
@@ -89,5 +92,12 @@ public interface ICoursesGatewayService
     
     // Quiz upload endpoint
     Task<ApiResponse<object>> UploadQuizFileAsync(string lessonId, IFormFile file, int quizScore);
+    
+    // Discussion endpoints
+    Task<ApiResponse<object>> GetDiscussionByLessonAsync(string lessonId);
+    Task<ApiResponse<object>> GetDiscussionByIdAsync(string id);
+    Task<ApiResponse<object>> CreateDiscussionAsync(object discussion);
+    Task<ApiResponse<object>> UpdateDiscussionAsync(string id, object discussion);
+    Task<ApiResponse<bool>> DeleteDiscussionAsync(string id);
 }
 

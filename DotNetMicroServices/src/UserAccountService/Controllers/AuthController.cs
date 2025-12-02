@@ -137,9 +137,15 @@ public class AuthController : ControllerBase
                 return NotFound(ApiResponse<UserInfoDto>.ErrorResponse("User not found"));
             }
 
+            _logger.LogInformation("UpdateProfile - Received DTO: Name={Name}, Gender={Gender}, DateOfBirth={DateOfBirth}, MobilePhone={MobilePhone}, Country={Country}, State={State}, City={City}, PostalCode={PostalCode}",
+                dto.Name, dto.Gender, dto.DateOfBirth, dto.MobilePhone, dto.Country, dto.State, dto.City, dto.PostalCode);
+
             // Update user profile - only update fields that are provided in DTO
             // Pass the DTO and existing user to the service method
             var result = await _userAccountService.UpdateUserAsync(userId, user, dto);
+            
+            _logger.LogInformation("UpdateProfile - Updated user: Gender={Gender}, DateOfBirth={DateOfBirth}, MobilePhone={MobilePhone}, Country={Country}, State={State}, City={City}, PostalCode={PostalCode}",
+                result?.Gender, result?.DateOfBirth, result?.MobilePhone, result?.Country, result?.State, result?.City, result?.PostalCode);
             if (result == null)
             {
                 return NotFound(ApiResponse<UserInfoDto>.ErrorResponse("User not found"));
@@ -151,7 +157,14 @@ public class AuthController : ControllerBase
                 Name = result.Name,
                 Email = result.Email,
                 Image = result.Image,
-                Role = result.Role
+                Role = result.Role,
+                Gender = result.Gender,
+                DateOfBirth = result.DateOfBirth,
+                MobilePhone = result.MobilePhone,
+                Country = result.Country,
+                State = result.State,
+                City = result.City,
+                PostalCode = result.PostalCode
             };
 
             return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "Profile updated successfully"));
@@ -184,11 +197,18 @@ public class AuthController : ControllerBase
 
             var response = new UserInfoDto
             {
-                Id = user.Id,
+                Id = user.Id ?? string.Empty,
                 Name = user.Name,
                 Email = user.Email,
                 Image = user.Image,
-                Role = user.Role
+                Role = user.Role,
+                Gender = user.Gender,
+                DateOfBirth = user.DateOfBirth,
+                MobilePhone = user.MobilePhone,
+                Country = user.Country,
+                State = user.State,
+                City = user.City,
+                PostalCode = user.PostalCode
             };
 
             return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "User retrieved successfully"));

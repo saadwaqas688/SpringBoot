@@ -18,6 +18,7 @@ public class CoursesDbContext
     public IMongoCollection<DiscussionPost> DiscussionPosts => _database.GetCollection<DiscussionPost>("discussion_posts");
     public IMongoCollection<Quiz> Quizzes => _database.GetCollection<Quiz>("quizzes");
     public IMongoCollection<QuizQuestion> QuizQuestions => _database.GetCollection<QuizQuestion>("quiz_questions");
+    public IMongoCollection<Discussion> Discussions => _database.GetCollection<Discussion>("discussions");
     public IMongoCollection<User> Users => _database.GetCollection<User>("users");
     public IMongoCollection<UserCourse> UserCourses => _database.GetCollection<UserCourse>("user_courses");
     public IMongoCollection<UserLessonProgress> UserLessonProgress => _database.GetCollection<UserLessonProgress>("user_lesson_progress");
@@ -79,6 +80,12 @@ public class CoursesDbContext
         await CreateIndexSafely(QuizQuestions,
             new CreateIndexModel<QuizQuestion>(Builders<QuizQuestion>.IndexKeys.Ascending(q => q.QuizId)),
             "QuizQuestion_QuizId");
+
+        // Discussion indexes - unique index to ensure one-to-one relationship with Lesson
+        await CreateIndexSafely(Discussions,
+            new CreateIndexModel<Discussion>(Builders<Discussion>.IndexKeys.Ascending(d => d.LessonId),
+                new CreateIndexOptions { Unique = true }),
+            "Discussion_LessonId_Unique");
 
         // User Course indexes
         await CreateIndexSafely(UserCourses,

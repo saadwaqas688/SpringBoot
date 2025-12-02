@@ -5,16 +5,19 @@ using UserAccountService.DTOs;
 using UserAccountService.Models;
 using Shared.Utils;
 using Shared.Common;
+using Microsoft.Extensions.Logging;
 
 namespace UserAccountService.Services;
 
 public class UserAccountService : IUserAccountService
 {
     private readonly MongoDbContext _context;
+    private readonly ILogger<UserAccountService>? _logger;
 
-    public UserAccountService(MongoDbContext context)
+    public UserAccountService(MongoDbContext context, ILogger<UserAccountService>? logger = null)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<UserAccount?> GetUserByEmailAsync(string email)
@@ -54,16 +57,64 @@ public class UserAccountService : IUserAccountService
 
         // Update Name if provided in DTO (not null)
         if (dto.Name != null)
+        {
             updateDefinition = updateDefinition.Set(u => u.Name, dto.Name);
+        }
         
         // Update Image if provided in DTO (not null - can be empty string to clear it)
         if (dto.Image != null)
+        {
             updateDefinition = updateDefinition.Set(u => u.Image, dto.Image);
+        }
 
-        await _context.UserAccounts.UpdateOneAsync(filter, updateDefinition);
+        // Update optional profile fields if provided (not null and not empty)
+        if (!string.IsNullOrEmpty(dto.Gender))
+        {
+            updateDefinition = updateDefinition.Set(u => u.Gender, dto.Gender);
+        }
+        
+        if (dto.DateOfBirth.HasValue)
+        {
+            updateDefinition = updateDefinition.Set(u => u.DateOfBirth, dto.DateOfBirth.Value);
+        }
+        
+        if (!string.IsNullOrEmpty(dto.MobilePhone))
+        {
+            updateDefinition = updateDefinition.Set(u => u.MobilePhone, dto.MobilePhone);
+        }
+        
+        if (!string.IsNullOrEmpty(dto.Country))
+        {
+            updateDefinition = updateDefinition.Set(u => u.Country, dto.Country);
+        }
+        
+        if (!string.IsNullOrEmpty(dto.State))
+        {
+            updateDefinition = updateDefinition.Set(u => u.State, dto.State);
+        }
+        
+        if (!string.IsNullOrEmpty(dto.City))
+        {
+            updateDefinition = updateDefinition.Set(u => u.City, dto.City);
+        }
+        
+        if (!string.IsNullOrEmpty(dto.PostalCode))
+        {
+            updateDefinition = updateDefinition.Set(u => u.PostalCode, dto.PostalCode);
+        }
+
+        var updateResult = await _context.UserAccounts.UpdateOneAsync(filter, updateDefinition);
+        
+        // Log update result
+        _logger?.LogInformation("UpdateResult - MatchedCount: {MatchedCount}, ModifiedCount: {ModifiedCount}", 
+            updateResult.MatchedCount, updateResult.ModifiedCount);
         
         // Return updated user
-        return await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
+        var updatedUser = await _context.UserAccounts.Find(filter).FirstOrDefaultAsync();
+        _logger?.LogInformation("Updated User - Gender: {Gender}, DateOfBirth: {DateOfBirth}, MobilePhone: {MobilePhone}, City: {City}, PostalCode: {PostalCode}",
+            updatedUser?.Gender, updatedUser?.DateOfBirth, updatedUser?.MobilePhone, updatedUser?.City, updatedUser?.PostalCode);
+        
+        return updatedUser;
     }
 
     public async Task<PagedResponse<UserAccount>> GetAllUsersAsync(int page, int pageSize, string? searchTerm = null)
