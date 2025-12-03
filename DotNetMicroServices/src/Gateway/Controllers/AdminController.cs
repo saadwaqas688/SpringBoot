@@ -20,15 +20,43 @@ public class AdminController : ControllerBase
     [HttpGet("analytics/courses")]
     public async Task<ActionResult<ApiResponse<object>>> GetCourseAnalytics()
     {
-        var response = await _coursesGatewayService.GetCourseAnalyticsAsync();
-        return StatusCode(response.Success ? 200 : 500, response);
+        try
+        {
+            var response = await _coursesGatewayService.GetCourseAnalyticsAsync();
+            if (response == null)
+            {
+                _logger.LogError("GetCourseAnalyticsAsync returned null response");
+                return StatusCode(500, ApiResponse<object>.ErrorResponse("Service unavailable. Please check if CoursesService is running."));
+            }
+            _logger.LogInformation("Course analytics response: Success={Success}, Message={Message}", response.Success, response.Message);
+            return StatusCode(response.Success ? 200 : 500, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception in GetCourseAnalytics");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse($"An error occurred: {ex.Message}"));
+        }
     }
 
     [HttpGet("analytics/users")]
     public async Task<ActionResult<ApiResponse<object>>> GetUserAnalytics()
     {
-        var response = await _coursesGatewayService.GetUserAnalyticsAsync();
-        return StatusCode(response.Success ? 200 : 500, response);
+        try
+        {
+            var response = await _coursesGatewayService.GetUserAnalyticsAsync();
+            if (response == null)
+            {
+                _logger.LogError("GetUserAnalyticsAsync returned null response");
+                return StatusCode(500, ApiResponse<object>.ErrorResponse("Service unavailable. Please check if CoursesService is running."));
+            }
+            _logger.LogInformation("User analytics response: Success={Success}, Message={Message}", response.Success, response.Message);
+            return StatusCode(response.Success ? 200 : 500, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception in GetUserAnalytics");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse($"An error occurred: {ex.Message}"));
+        }
     }
 
     [HttpGet("analytics/engagement")]

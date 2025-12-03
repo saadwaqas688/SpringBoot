@@ -184,5 +184,76 @@ public class UserAccountGatewayService : IUserAccountGatewayService
             return ApiResponse<string>.ErrorResponse("An error occurred during password reset");
         }
     }
+
+    public async Task<ApiResponse<UserInfoDto>> CreateUserAsync(CreateUserDto dto)
+    {
+        try
+        {
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<UserInfoDto>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.CreateUser,
+                dto);
+            return response ?? ApiResponse<UserInfoDto>.ErrorResponse("Failed to create user");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService to create user");
+            return ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while creating user");
+        }
+    }
+
+    public async Task<ApiResponse<UserInfoDto>> UpdateUserAsync(string id, UpdateUserDto dto)
+    {
+        try
+        {
+            var message = new { Id = id, Dto = dto };
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<UserInfoDto>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.UpdateUser,
+                message);
+            return response ?? ApiResponse<UserInfoDto>.ErrorResponse("Failed to update user");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService to update user");
+            return ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while updating user");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteUserAsync(string id)
+    {
+        try
+        {
+            var message = new { Id = id };
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<bool>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.DeleteUser,
+                message);
+            return response ?? ApiResponse<bool>.ErrorResponse("Failed to delete user");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService to delete user");
+            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting user");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> UpdateUserStatusAsync(string id, string status)
+    {
+        try
+        {
+            var message = new { Id = id, Status = status };
+            var response = await _rabbitMQService.SendMessageAsync<ApiResponse<bool>>(
+                RabbitMQConstants.UserAccountServiceQueue,
+                RabbitMQConstants.UserAccount.UpdateUserStatus,
+                message);
+            return response ?? ApiResponse<bool>.ErrorResponse("Failed to update user status");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling UserAccountService to update user status");
+            return ApiResponse<bool>.ErrorResponse("An error occurred while updating user status");
+        }
+    }
 }
 

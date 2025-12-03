@@ -98,7 +98,7 @@ public class AuthController : ControllerBase
         return StatusCode(response.Success ? 200 : 400, response);
     }
 
-    [Authorize(Roles = "admin")]
+    [Authorize]
     [HttpGet("users")]
     public async Task<ActionResult<ApiResponse<PagedResponse<UserInfoDto>>>> GetAllUsers(
         [FromQuery] int page = 1, 
@@ -108,5 +108,42 @@ public class AuthController : ControllerBase
         var response = await _userAccountGatewayService.GetAllUsersAsync(page, pageSize, searchTerm);
         return StatusCode(response.Success ? 200 : 500, response);
     }
+
+    [Authorize]
+    [HttpPost("users")]
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto)
+    {
+        var response = await _userAccountGatewayService.CreateUserAsync(dto);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+
+    [Authorize]
+    [HttpPut("users/{id}")]
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
+    {
+        var response = await _userAccountGatewayService.UpdateUserAsync(id, dto);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+
+    [Authorize]
+    [HttpDelete("users/{id}")]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string id)
+    {
+        var response = await _userAccountGatewayService.DeleteUserAsync(id);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+
+    [Authorize]
+    [HttpPut("users/{id}/status")]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto)
+    {
+        var response = await _userAccountGatewayService.UpdateUserStatusAsync(id, dto.Status);
+        return StatusCode(response.Success ? 200 : 400, response);
+    }
+}
+
+public class UpdateUserStatusDto
+{
+    public string Status { get; set; } = string.Empty;
 }
 

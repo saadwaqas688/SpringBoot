@@ -1049,33 +1049,90 @@ public class CoursesMessageHandler
     // Admin handlers
     private async Task<object> HandleGetCourseAnalytics(string messageJson)
     {
-        var coursesResponse = await _courseService.GetAllAsync(1, 10000);
-        var allCourses = coursesResponse.Data?.Items ?? new List<Course>();
-        var userCourses = await _userCourseRepository.GetAllAsync();
-        var analytics = new
+        try
         {
-            TotalCourses = allCourses.Count(),
-            PublishedCourses = allCourses.Count(c => c.Status == "published"),
-            DraftCourses = allCourses.Count(c => c.Status == "draft"),
-            TotalEnrollments = userCourses.Count(),
-            AverageEnrollmentsPerCourse = allCourses.Any() ? (int)Math.Round(userCourses.Count() / (double)allCourses.Count()) : 0,
-            CompletionRate = userCourses.Any() ? (int)Math.Round((userCourses.Count(uc => uc.Status == "completed") / (double)userCourses.Count()) * 100) : 0
-        };
-        return ApiResponse<object>.SuccessResponse(analytics, "Course analytics retrieved successfully");
+            _logger.LogInformation("Getting course analytics");
+            var coursesResponse = await _courseService.GetAllAsync(1, 10000);
+            
+            if (coursesResponse == null)
+            {
+                _logger.LogWarning("Course service returned null response");
+                return ApiResponse<object>.ErrorResponse("Failed to retrieve courses for analytics");
+            }
+            
+            if (!coursesResponse.Success)
+            {
+                _logger.LogWarning("Course service returned unsuccessful response: {Message}", coursesResponse.Message);
+                return ApiResponse<object>.ErrorResponse(coursesResponse.Message ?? "Failed to retrieve courses for analytics");
+            }
+            
+            if (coursesResponse.Data == null)
+            {
+                _logger.LogWarning("Course service returned null data");
+                return ApiResponse<object>.ErrorResponse("No course data available");
+            }
+            
+            var allCourses = coursesResponse.Data.Items?.ToList() ?? new List<Course>();
+            var userCoursesList = (await _userCourseRepository.GetAllAsync()).ToList();
+            
+            var analytics = new
+            {
+                TotalCourses = allCourses.Count,
+                PublishedCourses = allCourses.Count(c => c.Status == "published"),
+                DraftCourses = allCourses.Count(c => c.Status == "draft"),
+                TotalEnrollments = userCoursesList.Count,
+                AverageEnrollmentsPerCourse = allCourses.Any() ? (int)Math.Round(userCoursesList.Count / (double)allCourses.Count) : 0,
+                CompletionRate = userCoursesList.Any() ? (int)Math.Round((userCoursesList.Count(uc => uc.Status == "completed") / (double)userCoursesList.Count) * 100) : 0
+            };
+            
+            _logger.LogInformation("Course analytics calculated successfully. TotalCourses: {TotalCourses}", analytics.TotalCourses);
+            return ApiResponse<object>.SuccessResponse(analytics, "Course analytics retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting course analytics. Exception: {ExceptionType}, Message: {Message}", ex.GetType().Name, ex.Message);
+            return ApiResponse<object>.ErrorResponse($"An error occurred while retrieving course analytics: {ex.Message}");
+        }
     }
 
     private async Task<object> HandleGetUserAnalytics(string messageJson)
     {
-        var userCourses = await _userCourseRepository.GetAllAsync();
-        var uniqueUsers = userCourses.Select(uc => uc.UserId).Distinct();
-        var analytics = new
+        try
         {
-            TotalUsers = uniqueUsers.Count(),
-            ActiveUsers = uniqueUsers.Count(),
-            UsersWithCompletedCourses = uniqueUsers.Count(u => userCourses.Any(uc => uc.UserId == u && uc.Status == "completed")),
-            AverageCoursesPerUser = uniqueUsers.Any() ? (int)Math.Round(userCourses.Count() / (double)uniqueUsers.Count()) : 0
-        };
-        return ApiResponse<object>.SuccessResponse(analytics, "User analytics retrieved successfully");
+            _logger.LogInformation("Getting user analytics");
+            var userCoursesEnumerable = await _userCourseRepository.GetAllAsync();
+            var userCourses = userCoursesEnumerable?.ToList() ?? new List<UserCourse>();
+            
+            if (!userCourses.Any())
+            {
+                _logger.LogInformation("No user courses found, returning zero analytics");
+                return ApiResponse<object>.SuccessResponse(new
+                {
+                    TotalUsers = 0,
+                    ActiveUsers = 0,
+                    UsersWithCompletedCourses = 0,
+                    AverageCoursesPerUser = 0
+                }, "User analytics retrieved successfully");
+            }
+            
+            var uniqueUsers = userCourses.Select(uc => uc.UserId).Where(u => !string.IsNullOrEmpty(u)).Distinct().ToList();
+            
+            var analytics = new
+            {
+                TotalUsers = uniqueUsers.Count,
+                ActiveUsers = uniqueUsers.Count,
+                UsersWithCompletedCourses = uniqueUsers.Count(u => userCourses.Any(uc => uc.UserId == u && uc.Status == "completed")),
+                AverageCoursesPerUser = uniqueUsers.Any() ? (int)Math.Round(userCourses.Count / (double)uniqueUsers.Count) : 0
+            };
+            
+            _logger.LogInformation("User analytics calculated successfully. TotalUsers: {TotalUsers}", analytics.TotalUsers);
+            return ApiResponse<object>.SuccessResponse(analytics, "User analytics retrieved successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user analytics. Exception: {ExceptionType}, Message: {Message}", ex.GetType().Name, ex.Message);
+            return ApiResponse<object>.ErrorResponse($"An error occurred while retrieving user analytics: {ex.Message}");
+        }
     }
 
     private async Task<object> HandleGetEngagementAnalytics(string messageJson)

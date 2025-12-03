@@ -20,6 +20,9 @@ public class UserAccount
     [BsonElement("role")]
     public string Role { get; set; } = "user"; // Default role is "user"
     
+    [BsonElement("status")]
+    public string Status { get; set; } = "active"; // "active" or "inactive"
+    
     // Optional profile fields
     [BsonElement("gender")]
     public string? Gender { get; set; }

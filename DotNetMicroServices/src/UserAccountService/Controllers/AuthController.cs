@@ -5,6 +5,7 @@ using UserAccountService.DTOs;
 using UserAccountService.Models;
 using UserAccountService.Services;
 using Shared.Common;
+using System.ComponentModel.DataAnnotations;
 
 namespace UserAccountService.Controllers;
 
@@ -62,7 +63,9 @@ public class AuthController : ControllerBase
                     Name = createdUser.Name,
                     Email = createdUser.Email,
                     Image = createdUser.Image,
-                    Role = createdUser.Role
+                    Role = createdUser.Role,
+                    Status = createdUser.Status,
+                    CreatedAt = createdUser.CreatedAt
                 }
             };
 
@@ -202,6 +205,8 @@ public class AuthController : ControllerBase
                 Email = user.Email,
                 Image = user.Image,
                 Role = user.Role,
+                Status = user.Status,
+                CreatedAt = user.CreatedAt,
                 Gender = user.Gender,
                 DateOfBirth = user.DateOfBirth,
                 MobilePhone = user.MobilePhone,
@@ -333,7 +338,16 @@ public class AuthController : ControllerBase
                 Name = u.Name,
                 Email = u.Email,
                 Image = u.Image,
-                Role = u.Role
+                Role = u.Role,
+                Status = u.Status,
+                CreatedAt = u.CreatedAt,
+                Gender = u.Gender,
+                DateOfBirth = u.DateOfBirth,
+                MobilePhone = u.MobilePhone,
+                Country = u.Country,
+                State = u.State,
+                City = u.City,
+                PostalCode = u.PostalCode
             }).ToList();
 
             var pagedResponse = new PagedResponse<UserInfoDto>
@@ -352,5 +366,156 @@ public class AuthController : ControllerBase
             return StatusCode(500, ApiResponse<PagedResponse<UserInfoDto>>.ErrorResponse("An error occurred while retrieving users"));
         }
     }
+
+    [HttpPost("users")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto)
+    {
+        try
+        {
+            // Check if user already exists
+            var existingUser = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            if (existingUser != null)
+            {
+                return BadRequest(ApiResponse<UserInfoDto>.ErrorResponse("User with this email already exists"));
+            }
+
+            // Create new user
+            var user = new UserAccount
+            {
+                Name = $"{dto.FirstName} {dto.LastName}".Trim(),
+                Email = dto.Email,
+                PasswordHash = _authService.HashPassword(dto.Password),
+                Image = dto.Image,
+                Role = dto.Role ?? "user",
+                Status = dto.Status ?? "active",
+                Gender = dto.Gender,
+                DateOfBirth = dto.DateOfBirth,
+                MobilePhone = dto.MobilePhone,
+                Country = dto.Country,
+                State = dto.State,
+                City = dto.City,
+                PostalCode = dto.PostalCode
+            };
+
+            var createdUser = await _userAccountService.CreateUserAsync(user);
+
+            var response = new UserInfoDto
+            {
+                Id = createdUser.Id ?? string.Empty,
+                Name = createdUser.Name,
+                Email = createdUser.Email,
+                Image = createdUser.Image,
+                Role = createdUser.Role,
+                Status = createdUser.Status,
+                CreatedAt = createdUser.CreatedAt,
+                Gender = createdUser.Gender,
+                DateOfBirth = createdUser.DateOfBirth,
+                MobilePhone = createdUser.MobilePhone,
+                Country = createdUser.Country,
+                State = createdUser.State,
+                City = createdUser.City,
+                PostalCode = createdUser.PostalCode
+            };
+
+            return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "User created successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating user");
+            return StatusCode(500, ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while creating user"));
+        }
+    }
+
+    [HttpPut("users/{id}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
+    {
+        try
+        {
+            var updatedUser = await _userAccountService.UpdateUserAdminAsync(id, dto);
+            if (updatedUser == null)
+            {
+                return NotFound(ApiResponse<UserInfoDto>.ErrorResponse("User not found"));
+            }
+
+            var response = new UserInfoDto
+            {
+                Id = updatedUser.Id ?? string.Empty,
+                Name = updatedUser.Name,
+                Email = updatedUser.Email,
+                Image = updatedUser.Image,
+                Role = updatedUser.Role,
+                Status = updatedUser.Status,
+                CreatedAt = updatedUser.CreatedAt,
+                Gender = updatedUser.Gender,
+                DateOfBirth = updatedUser.DateOfBirth,
+                MobilePhone = updatedUser.MobilePhone,
+                Country = updatedUser.Country,
+                State = updatedUser.State,
+                City = updatedUser.City,
+                PostalCode = updatedUser.PostalCode
+            };
+
+            return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "User updated successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user {UserId}", id);
+            return StatusCode(500, ApiResponse<UserInfoDto>.ErrorResponse("An error occurred while updating user"));
+        }
+    }
+
+    [HttpDelete("users/{id}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string id)
+    {
+        try
+        {
+            var deleted = await _userAccountService.DeleteUserAsync(id);
+            if (!deleted)
+            {
+                return NotFound(ApiResponse<bool>.ErrorResponse("User not found"));
+            }
+
+            return Ok(ApiResponse<bool>.SuccessResponse(true, "User deleted successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user {UserId}", id);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting user"));
+        }
+    }
+
+    [HttpPut("users/{id}/status")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(dto.Status) || (dto.Status != "active" && dto.Status != "inactive"))
+            {
+                return BadRequest(ApiResponse<bool>.ErrorResponse("Status must be 'active' or 'inactive'"));
+            }
+
+            var updated = await _userAccountService.UpdateUserStatusAsync(id, dto.Status);
+            if (!updated)
+            {
+                return NotFound(ApiResponse<bool>.ErrorResponse("User not found"));
+            }
+
+            return Ok(ApiResponse<bool>.SuccessResponse(true, "User status updated successfully"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user status {UserId}", id);
+            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while updating user status"));
+        }
+    }
+}
+
+public class UpdateUserStatusDto
+{
+    public string Status { get; set; } = string.Empty;
 }
 

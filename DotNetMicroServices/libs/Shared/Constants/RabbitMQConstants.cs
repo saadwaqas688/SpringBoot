@@ -15,6 +15,10 @@ public static class RabbitMQConstants
         public const string UpdateProfile = "useraccount.update-profile";
         public const string GetCurrentUser = "useraccount.get-current-user";
         public const string GetAllUsers = "useraccount.get-all-users";
+        public const string CreateUser = "useraccount.create-user";
+        public const string UpdateUser = "useraccount.update-user";
+        public const string DeleteUser = "useraccount.delete-user";
+        public const string UpdateUserStatus = "useraccount.update-user-status";
         public const string RefreshToken = "useraccount.refresh-token";
         public const string ForgotPassword = "useraccount.forgot-password";
         public const string ResetPassword = "useraccount.reset-password";

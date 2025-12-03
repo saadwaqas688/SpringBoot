@@ -43,6 +43,10 @@ public class UserAccountMessageHandler
                 RabbitMQConstants.UserAccount.UpdateProfile => await HandleUpdateProfile(messageJson),
                 RabbitMQConstants.UserAccount.GetCurrentUser => await HandleGetCurrentUser(messageJson),
                 RabbitMQConstants.UserAccount.GetAllUsers => await HandleGetAllUsers(messageJson),
+                RabbitMQConstants.UserAccount.CreateUser => await HandleCreateUser(messageJson),
+                RabbitMQConstants.UserAccount.UpdateUser => await HandleUpdateUser(messageJson),
+                RabbitMQConstants.UserAccount.DeleteUser => await HandleDeleteUser(messageJson),
+                RabbitMQConstants.UserAccount.UpdateUserStatus => await HandleUpdateUserStatus(messageJson),
                 RabbitMQConstants.UserAccount.RefreshToken => await HandleRefreshToken(messageJson),
                 RabbitMQConstants.UserAccount.ForgotPassword => await HandleForgotPassword(messageJson),
                 RabbitMQConstants.UserAccount.ResetPassword => await HandleResetPassword(messageJson),
@@ -103,7 +107,9 @@ public class UserAccountMessageHandler
                     Name = createdUser.Name,
                     Email = createdUser.Email,
                     Image = createdUser.Image,
-                    Role = createdUser.Role
+                    Role = createdUser.Role,
+                    Status = createdUser.Status,
+                    CreatedAt = createdUser.CreatedAt
                 }
             };
 
@@ -251,6 +257,8 @@ public class UserAccountMessageHandler
                 Email = user.Email,
                 Image = user.Image,
                 Role = user.Role,
+                Status = user.Status,
+                CreatedAt = user.CreatedAt,
                 Gender = user.Gender,
                 DateOfBirth = user.DateOfBirth,
                 MobilePhone = user.MobilePhone,
@@ -325,7 +333,16 @@ public class UserAccountMessageHandler
                 Name = u.Name,
                 Email = u.Email,
                 Image = u.Image,
-                Role = u.Role
+                Role = u.Role,
+                Status = u.Status,
+                CreatedAt = u.CreatedAt,
+                Gender = u.Gender,
+                DateOfBirth = u.DateOfBirth,
+                MobilePhone = u.MobilePhone,
+                Country = u.Country,
+                State = u.State,
+                City = u.City,
+                PostalCode = u.PostalCode
             }).ToList();
 
             var pagedResponse = new PagedResponse<UserInfoDto>
@@ -446,5 +463,182 @@ public class UserAccountMessageHandler
             _logger.LogError(ex, "Error in HandleResetPassword");
             return ApiResponse<string>.ErrorResponse($"Error resetting password: {ex.Message}");
         }
+    }
+
+    private async Task<object> HandleCreateUser(string messageJson)
+    {
+        try
+        {
+            var dto = JsonSerializer.Deserialize<CreateUserDto>(messageJson, _jsonOptions);
+            if (dto == null)
+            {
+                return ApiResponse<UserInfoDto>.ErrorResponse("Invalid user data");
+            }
+
+            var existingUser = await _userAccountService.GetUserByEmailAsync(dto.Email);
+            if (existingUser != null)
+            {
+                return ApiResponse<UserInfoDto>.ErrorResponse("User with this email already exists");
+            }
+
+            var user = new UserAccount
+            {
+                Name = $"{dto.FirstName} {dto.LastName}".Trim(),
+                Email = dto.Email,
+                PasswordHash = _authService.HashPassword(dto.Password),
+                Image = dto.Image,
+                Role = dto.Role ?? "user",
+                Status = dto.Status ?? "active",
+                Gender = dto.Gender,
+                DateOfBirth = dto.DateOfBirth,
+                MobilePhone = dto.MobilePhone,
+                Country = dto.Country,
+                State = dto.State,
+                City = dto.City,
+                PostalCode = dto.PostalCode
+            };
+
+            var createdUser = await _userAccountService.CreateUserAsync(user);
+
+            var response = new UserInfoDto
+            {
+                Id = createdUser.Id ?? string.Empty,
+                Name = createdUser.Name,
+                Email = createdUser.Email,
+                Image = createdUser.Image,
+                Role = createdUser.Role,
+                Status = createdUser.Status,
+                CreatedAt = createdUser.CreatedAt,
+                Gender = createdUser.Gender,
+                DateOfBirth = createdUser.DateOfBirth,
+                MobilePhone = createdUser.MobilePhone,
+                Country = createdUser.Country,
+                State = createdUser.State,
+                City = createdUser.City,
+                PostalCode = createdUser.PostalCode
+            };
+
+            return ApiResponse<UserInfoDto>.SuccessResponse(response, "User created successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleCreateUser");
+            return ApiResponse<UserInfoDto>.ErrorResponse($"Error creating user: {ex.Message}");
+        }
+    }
+
+    private async Task<object> HandleUpdateUser(string messageJson)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<UpdateUserRequest>(messageJson, _jsonOptions);
+            if (request == null || string.IsNullOrEmpty(request.Id) || request.Dto == null)
+            {
+                return ApiResponse<UserInfoDto>.ErrorResponse("Invalid update user data");
+            }
+
+            var updatedUser = await _userAccountService.UpdateUserAdminAsync(request.Id, request.Dto);
+            if (updatedUser == null)
+            {
+                return ApiResponse<UserInfoDto>.ErrorResponse("User not found");
+            }
+
+            var response = new UserInfoDto
+            {
+                Id = updatedUser.Id ?? string.Empty,
+                Name = updatedUser.Name,
+                Email = updatedUser.Email,
+                Image = updatedUser.Image,
+                Role = updatedUser.Role,
+                Status = updatedUser.Status,
+                CreatedAt = updatedUser.CreatedAt,
+                Gender = updatedUser.Gender,
+                DateOfBirth = updatedUser.DateOfBirth,
+                MobilePhone = updatedUser.MobilePhone,
+                Country = updatedUser.Country,
+                State = updatedUser.State,
+                City = updatedUser.City,
+                PostalCode = updatedUser.PostalCode
+            };
+
+            return ApiResponse<UserInfoDto>.SuccessResponse(response, "User updated successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleUpdateUser");
+            return ApiResponse<UserInfoDto>.ErrorResponse($"Error updating user: {ex.Message}");
+        }
+    }
+
+    private async Task<object> HandleDeleteUser(string messageJson)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<DeleteUserRequest>(messageJson, _jsonOptions);
+            if (request == null || string.IsNullOrEmpty(request.Id))
+            {
+                return ApiResponse<bool>.ErrorResponse("Invalid delete user data");
+            }
+
+            var deleted = await _userAccountService.DeleteUserAsync(request.Id);
+            if (!deleted)
+            {
+                return ApiResponse<bool>.ErrorResponse("User not found");
+            }
+
+            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleDeleteUser");
+            return ApiResponse<bool>.ErrorResponse($"Error deleting user: {ex.Message}");
+        }
+    }
+
+    private async Task<object> HandleUpdateUserStatus(string messageJson)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<UpdateUserStatusRequest>(messageJson, _jsonOptions);
+            if (request == null || string.IsNullOrEmpty(request.Id) || string.IsNullOrEmpty(request.Status))
+            {
+                return ApiResponse<bool>.ErrorResponse("Invalid update user status data");
+            }
+
+            if (request.Status != "active" && request.Status != "inactive")
+            {
+                return ApiResponse<bool>.ErrorResponse("Status must be 'active' or 'inactive'");
+            }
+
+            var updated = await _userAccountService.UpdateUserStatusAsync(request.Id, request.Status);
+            if (!updated)
+            {
+                return ApiResponse<bool>.ErrorResponse("User not found");
+            }
+
+            return ApiResponse<bool>.SuccessResponse(true, "User status updated successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in HandleUpdateUserStatus");
+            return ApiResponse<bool>.ErrorResponse($"Error updating user status: {ex.Message}");
+        }
+    }
+
+    private class UpdateUserRequest
+    {
+        public string Id { get; set; } = string.Empty;
+        public UpdateUserDto? Dto { get; set; }
+    }
+
+    private class DeleteUserRequest
+    {
+        public string Id { get; set; } = string.Empty;
+    }
+
+    private class UpdateUserStatusRequest
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
     }
 }

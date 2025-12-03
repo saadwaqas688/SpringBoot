@@ -13,6 +13,8 @@ public class UserInfoDto
     public string Email { get; set; } = string.Empty;
     public string? Image { get; set; }
     public string Role { get; set; } = string.Empty;
+    public string Status { get; set; } = "active";
+    public DateTime? CreatedAt { get; set; }
     
     // Optional profile fields
     public string? Gender { get; set; }
