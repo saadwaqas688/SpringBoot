@@ -79,6 +79,8 @@ builder.Services.AddScoped<IQuizQuestionRepository>(sp =>
 
 // Register Services
 builder.Services.AddScoped<IQuizFileParserService, QuizFileParserService>();
+builder.Services.AddScoped<IDiscussionPostService, DiscussionPostService>();
+builder.Services.AddScoped<ILessonService, LessonService>();
 
 builder.Services.AddScoped<IUserCourseRepository>(sp =>
 {
@@ -135,9 +137,10 @@ builder.Services.AddScoped<CoursesMessageHandler>(sp =>
 {
     return new CoursesMessageHandler(
         sp.GetRequiredService<ICourseService>(),
+        sp.GetRequiredService<IDiscussionPostService>(),
+        sp.GetRequiredService<ILessonService>(),
         sp.GetRequiredService<ILessonRepository>(),
         sp.GetRequiredService<IStandardSlideRepository>(),
-        sp.GetRequiredService<IDiscussionPostRepository>(),
         sp.GetRequiredService<IDiscussionRepository>(),
         sp.GetRequiredService<IQuizRepository>(),
         sp.GetRequiredService<IQuizQuestionRepository>(),

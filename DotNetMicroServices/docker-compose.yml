@@ -33,40 +33,6 @@ services:
       retries: 5
       start_period: 30s
 
-  userservice:
-    build:
-      context: .
-      dockerfile: Dockerfile.userservice.dev
-    container_name: userservice
-    ports:
-      - "5002:5002"
-    volumes:
-      - ./src/UserService:/app/src/UserService
-      - ./libs/Shared:/app/libs/Shared
-      - /app/src/UserService/bin
-      - /app/src/UserService/obj
-      - /app/libs/Shared/bin
-      - /app/libs/Shared/obj
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:5002
-      - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__Port=5672
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - microservices-network
-    healthcheck:
-      test:
-        ["CMD", "curl", "-f", "http://localhost:5002/swagger/v1/swagger.json"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
   useraccountservice:
     build:
       context: .
@@ -160,7 +126,6 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
-      - ServiceUrls__UserService=http://userservice:5002
       - ServiceUrls__UserAccountService=http://useraccountservice:5003
       - ServiceUrls__CoursesService=http://coursesservice:5004
       - RabbitMQ__HostName=rabbitmq
@@ -169,8 +134,6 @@ services:
       - RabbitMQ__Password=guest
     depends_on:
       rabbitmq:
-        condition: service_healthy
-      userservice:
         condition: service_healthy
       useraccountservice:
         condition: service_healthy

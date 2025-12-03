@@ -196,10 +196,7 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
               Upload Quiz
             </Button>
           )}
-          <IconButton
-            size="small"
-            sx={{ display: { xs: "none", sm: "flex" } }}
-          >
+          <IconButton size="small" sx={{ display: { xs: "none", sm: "flex" } }}>
             <MoreVertIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -224,191 +221,202 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
               position: "relative",
             }}
           >
-            {sortedQuizQuestions[currentQuestionIndex] && (() => {
-              const question = sortedQuizQuestions[currentQuestionIndex];
-              const questionId = question.id || question.Id || "";
-              const options = question.options || question.Options || [];
-              const selectedAnswer = selectedAnswers[questionId];
-              const optionLabels = ["A", "B", "C", "D"];
+            {sortedQuizQuestions[currentQuestionIndex] &&
+              (() => {
+                const question = sortedQuizQuestions[currentQuestionIndex];
+                const questionId = question.id || question.Id || "";
+                const options = question.options || question.Options || [];
+                const selectedAnswer = selectedAnswers[questionId];
+                const optionLabels = ["A", "B", "C", "D"];
 
-              return (
-                <Box
-                  sx={{ maxWidth: 800, mx: "auto", width: "100%", color: "white" }}
-                >
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      fontWeight: 600,
-                      mb: 4,
-                      color: "white",
-                      fontSize: { xs: "1.25rem", sm: "1.5rem", md: "1.75rem" },
-                    }}
-                  >
-                    {question.question || question.Question}
-                  </Typography>
-
+                return (
                   <Box
                     sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 2,
-                      mb: 4,
+                      maxWidth: 800,
+                      mx: "auto",
+                      width: "100%",
+                      color: "white",
                     }}
                   >
-                    {options.map((option: any, index: number) => {
-                      const optionValue = option.value || option.Value || "";
-                      const isCorrect =
-                        option.isCorrect || option.IsCorrect || false;
-                      const isSelected =
-                        selectedAnswer === index.toString();
+                    <Typography
+                      variant="h5"
+                      sx={{
+                        fontWeight: 600,
+                        mb: 4,
+                        color: "white",
+                        fontSize: {
+                          xs: "1.25rem",
+                          sm: "1.5rem",
+                          md: "1.75rem",
+                        },
+                      }}
+                    >
+                      {question.question || question.Question}
+                    </Typography>
 
-                      return (
-                        <Box
-                          key={index}
-                          onClick={() => onAnswerSelect(questionId, index)}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                            p: 2,
-                            borderRadius: 2,
-                            backgroundColor: isCorrect
-                              ? "rgba(34, 197, 94, 0.3)"
-                              : isSelected
-                              ? "rgba(255, 255, 255, 0.2)"
-                              : "rgba(255, 255, 255, 0.1)",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            border: isCorrect
-                              ? "2px solid rgba(34, 197, 94, 0.6)"
-                              : "none",
-                            "&:hover": {
-                              backgroundColor: isCorrect
-                                ? "rgba(34, 197, 94, 0.4)"
-                                : "rgba(255, 255, 255, 0.2)",
-                            },
-                          }}
-                        >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        mb: 4,
+                      }}
+                    >
+                      {options.map((option: any, index: number) => {
+                        const optionValue = option.value || option.Value || "";
+                        const isCorrect =
+                          option.isCorrect || option.IsCorrect || false;
+                        const isSelected = selectedAnswer === index.toString();
+
+                        return (
                           <Box
+                            key={index}
+                            onClick={() => onAnswerSelect(questionId, index)}
                             sx={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: "50%",
-                              backgroundColor: isCorrect
-                                ? "#22c55e"
-                                : isSelected
-                                ? "#a78bfa"
-                                : "rgba(255, 255, 255, 0.3)",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center",
-                              border: isCorrect
-                                ? "2px solid #16a34a"
+                              gap: 2,
+                              p: 2,
+                              borderRadius: 2,
+                              backgroundColor: isCorrect
+                                ? "rgba(34, 197, 94, 0.3)"
                                 : isSelected
-                                ? "2px solid #8b5cf6"
-                                : "2px solid rgba(255, 255, 255, 0.5)",
+                                ? "rgba(255, 255, 255, 0.2)"
+                                : "rgba(255, 255, 255, 0.1)",
+                              cursor: "pointer",
+                              transition: "all 0.2s",
+                              border: isCorrect
+                                ? "2px solid rgba(34, 197, 94, 0.6)"
+                                : "none",
+                              "&:hover": {
+                                backgroundColor: isCorrect
+                                  ? "rgba(34, 197, 94, 0.4)"
+                                  : "rgba(255, 255, 255, 0.2)",
+                              },
                             }}
                           >
-                            {(isCorrect || isSelected) && (
-                              <Box
-                                component="span"
-                                sx={{
-                                  color: "white",
-                                  fontSize: 20,
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                ✓
-                              </Box>
-                            )}
+                            <Box
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: "50%",
+                                backgroundColor: isCorrect
+                                  ? "#22c55e"
+                                  : isSelected
+                                  ? "#a78bfa"
+                                  : "rgba(255, 255, 255, 0.3)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                border: isCorrect
+                                  ? "2px solid #16a34a"
+                                  : isSelected
+                                  ? "2px solid #8b5cf6"
+                                  : "2px solid rgba(255, 255, 255, 0.5)",
+                              }}
+                            >
+                              {(isCorrect || isSelected) && (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    color: "white",
+                                    fontSize: 20,
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  ✓
+                                </Box>
+                              )}
+                            </Box>
+                            <Typography
+                              sx={{
+                                fontWeight: 500,
+                                fontSize: { xs: "0.875rem", sm: "1rem" },
+                                color: "white",
+                              }}
+                            >
+                              {optionLabels[index]}. {optionValue}
+                              {isCorrect && (
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    ml: 1,
+                                    fontSize: "0.75rem",
+                                    color: "#86efac",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  (Correct)
+                                </Typography>
+                              )}
+                            </Typography>
                           </Box>
-                          <Typography
-                            sx={{
-                              fontWeight: 500,
-                              fontSize: { xs: "0.875rem", sm: "1rem" },
-                              color: "white",
-                            }}
-                          >
-                            {optionLabels[index]}. {optionValue}
-                            {isCorrect && (
-                              <Typography
-                                component="span"
-                                sx={{
-                                  ml: 1,
-                                  fontSize: "0.75rem",
-                                  color: "#86efac",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                (Correct)
-                              </Typography>
-                            )}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                        );
+                      })}
+                    </Box>
 
-                  {/* Navigation */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 2,
-                      mt: 4,
-                    }}
-                  >
-                    <IconButton
-                      onClick={() => onQuestionNavigation("prev")}
-                      disabled={currentQuestionIndex === 0}
+                    {/* Navigation */}
+                    <Box
                       sx={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "white",
-                        "&:hover": {
-                          backgroundColor: "rgba(255, 255, 255, 0.3)",
-                        },
-                        "&.Mui-disabled": {
-                          backgroundColor: "rgba(255, 255, 255, 0.1)",
-                          color: "rgba(255, 255, 255, 0.5)",
-                        },
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: 2,
+                        mt: 4,
                       }}
                     >
-                      <ArrowBackIcon />
-                    </IconButton>
-                    <Typography
-                      sx={{
-                        color: "white",
-                        fontWeight: 500,
-                        minWidth: 60,
-                        textAlign: "center",
-                      }}
-                    >
-                      {currentQuestionIndex + 1} / {sortedQuizQuestions.length}
-                    </Typography>
-                    <IconButton
-                      onClick={() => onQuestionNavigation("next")}
-                      disabled={
-                        currentQuestionIndex === sortedQuizQuestions.length - 1
-                      }
-                      sx={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "white",
-                        "&:hover": {
-                          backgroundColor: "rgba(255, 255, 255, 0.3)",
-                        },
-                        "&.Mui-disabled": {
-                          backgroundColor: "rgba(255, 255, 255, 0.1)",
-                          color: "rgba(255, 255, 255, 0.5)",
-                        },
-                      }}
-                    >
-                      <ArrowForwardIcon />
-                    </IconButton>
+                      <IconButton
+                        onClick={() => onQuestionNavigation("prev")}
+                        disabled={currentQuestionIndex === 0}
+                        sx={{
+                          backgroundColor: "rgba(255, 255, 255, 0.2)",
+                          color: "white",
+                          "&:hover": {
+                            backgroundColor: "rgba(255, 255, 255, 0.3)",
+                          },
+                          "&.Mui-disabled": {
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                            color: "rgba(255, 255, 255, 0.5)",
+                          },
+                        }}
+                      >
+                        <ArrowBackIcon />
+                      </IconButton>
+                      <Typography
+                        sx={{
+                          color: "white",
+                          fontWeight: 500,
+                          minWidth: 60,
+                          textAlign: "center",
+                        }}
+                      >
+                        {currentQuestionIndex + 1} /{" "}
+                        {sortedQuizQuestions.length}
+                      </Typography>
+                      <IconButton
+                        onClick={() => onQuestionNavigation("next")}
+                        disabled={
+                          currentQuestionIndex ===
+                          sortedQuizQuestions.length - 1
+                        }
+                        sx={{
+                          backgroundColor: "rgba(255, 255, 255, 0.2)",
+                          color: "white",
+                          "&:hover": {
+                            backgroundColor: "rgba(255, 255, 255, 0.3)",
+                          },
+                          "&.Mui-disabled": {
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                            color: "rgba(255, 255, 255, 0.5)",
+                          },
+                        }}
+                      >
+                        <ArrowForwardIcon />
+                      </IconButton>
+                    </Box>
                   </Box>
-                </Box>
-              );
-            })()}
+                );
+              })()}
           </Box>
         ) : quizLoading || questionsLoading ? (
           <Box
@@ -482,7 +490,9 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
             {quizError && (
               <Typography variant="body2" color="error" sx={{ mb: 2 }}>
                 Error:{" "}
-                {"message" in quizError ? quizError.message : "Failed to load quiz"}
+                {"message" in quizError
+                  ? quizError.message
+                  : "Failed to load quiz"}
               </Typography>
             )}
             {questionsError && (
@@ -537,7 +547,13 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
             {slideTitle}
           </Typography>
 
-          <Box sx={{ maxWidth: { xs: "100%", md: 600 }, mx: "auto", width: "100%" }}>
+          <Box
+            sx={{
+              maxWidth: { xs: "100%", md: 600 },
+              mx: "auto",
+              width: "100%",
+            }}
+          >
             {previewIsSingleImage ? (
               // Single Image Preview
               <Box>
@@ -869,7 +885,11 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
                                 preload="metadata"
                                 playsInline
                                 onError={(e) => {
-                                  console.error("Video failed to load:", video.url, e);
+                                  console.error(
+                                    "Video failed to load:",
+                                    video.url,
+                                    e
+                                  );
                                 }}
                                 style={{
                                   width: "100%",
@@ -942,10 +962,7 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
               // Expandable List Preview
               <Box>
                 {expandableListItems.map((item, index) => {
-                  const isExpanded =
-                    focusMode && expandedItemIndex === index
-                      ? true
-                      : !focusMode && expandedItemIndex === index;
+                  const isExpanded = expandedItemIndex === index;
 
                   return (
                     <Box
@@ -1070,7 +1087,10 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
             minHeight: { xs: 400, md: "auto" },
           }}
         >
-          <Typography variant="h6" sx={{ textAlign: "center", color: "text.secondary" }}>
+          <Typography
+            variant="h6"
+            sx={{ textAlign: "center", color: "text.secondary" }}
+          >
             Select a slide to preview
           </Typography>
         </Box>
@@ -1163,4 +1183,3 @@ const ContentPreviewPanel: React.FC<ContentPreviewPanelProps> = ({
 };
 
 export default ContentPreviewPanel;
-

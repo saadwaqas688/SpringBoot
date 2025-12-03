@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
-using CoursesService.Repositories;
+using CoursesService.Services;
 using CoursesService.DTOs;
 using Shared.Common;
 
@@ -10,124 +10,69 @@ namespace CoursesService.Controllers;
 [Route("api")]
 public class DiscussionPostsController : ControllerBase
 {
-    private readonly IDiscussionPostRepository _postRepository;
-    private readonly ILogger<DiscussionPostsController> _logger;
+    private readonly IDiscussionPostService _postService;
 
-    public DiscussionPostsController(
-        IDiscussionPostRepository postRepository,
-        ILogger<DiscussionPostsController> logger)
+    public DiscussionPostsController(IDiscussionPostService postService)
     {
-        _postRepository = postRepository;
-        _logger = logger;
+        _postService = postService;
     }
 
     [HttpGet("lessons/{lessonId}/posts")]
     public async Task<ActionResult<ApiResponse<List<DiscussionPostWithUserDto>>>> GetPostsByLesson(string lessonId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        try
-        {
-            var posts = await _postRepository.GetPostsByLessonIdWithUsersAsync(lessonId);
-            var pagedPosts = posts.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Ok(ApiResponse<List<DiscussionPostWithUserDto>>.SuccessResponse(pagedPosts, "Posts retrieved successfully"));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving posts for lesson {LessonId}", lessonId);
-            return StatusCode(500, ApiResponse<List<DiscussionPostWithUserDto>>.ErrorResponse("An error occurred while retrieving posts"));
-        }
+        var response = await _postService.GetPostsByLessonAsync(lessonId, page, pageSize);
+        return response.Success ? Ok(response) : StatusCode(500, response);
     }
 
     [HttpGet("posts/{postId}")]
     public async Task<ActionResult<ApiResponse<DiscussionPost>>> GetPostById(string postId)
     {
-        try
+        var response = await _postService.GetPostByIdAsync(postId);
+        if (!response.Success && response.Message == "Post not found")
         {
-            var post = await _postRepository.GetByIdAsync(postId);
-            if (post == null)
-            {
-                return NotFound(ApiResponse<DiscussionPost>.ErrorResponse("Post not found"));
-            }
-            return Ok(ApiResponse<DiscussionPost>.SuccessResponse(post, "Post retrieved successfully"));
+            return NotFound(response);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving post {PostId}", postId);
-            return StatusCode(500, ApiResponse<DiscussionPost>.ErrorResponse("An error occurred while retrieving post"));
-        }
+        return response.Success ? Ok(response) : StatusCode(500, response);
     }
 
     [HttpPost("posts")]
     public async Task<ActionResult<ApiResponse<DiscussionPost>>> CreatePost([FromBody] DiscussionPost post)
     {
-        try
+        var response = await _postService.CreatePostAsync(post);
+        if (response.Success && response.Data != null)
         {
-            post.CreatedAt = DateTime.UtcNow;
-            post.UpdatedAt = DateTime.UtcNow;
-            var created = await _postRepository.CreateAsync(post);
-            return CreatedAtAction(nameof(GetPostById), new { postId = created.Id },
-                ApiResponse<DiscussionPost>.SuccessResponse(created, "Post created successfully"));
+            return CreatedAtAction(nameof(GetPostById), new { postId = response.Data.Id }, response);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating post");
-            return StatusCode(500, ApiResponse<DiscussionPost>.ErrorResponse("An error occurred while creating post"));
-        }
+        return StatusCode(500, response);
     }
 
     [HttpPut("posts/{postId}")]
     public async Task<ActionResult<ApiResponse<DiscussionPost>>> UpdatePost(string postId, [FromBody] DiscussionPost post)
     {
-        try
+        var response = await _postService.UpdatePostAsync(postId, post);
+        if (!response.Success && response.Message == "Post not found")
         {
-            post.Id = postId;
-            post.UpdatedAt = DateTime.UtcNow;
-            var updated = await _postRepository.UpdateAsync(postId, post);
-            if (updated == null)
-            {
-                return NotFound(ApiResponse<DiscussionPost>.ErrorResponse("Post not found"));
-            }
-            return Ok(ApiResponse<DiscussionPost>.SuccessResponse(updated, "Post updated successfully"));
+            return NotFound(response);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating post {PostId}", postId);
-            return StatusCode(500, ApiResponse<DiscussionPost>.ErrorResponse("An error occurred while updating post"));
-        }
+        return response.Success ? Ok(response) : StatusCode(500, response);
     }
 
     [HttpDelete("posts/{postId}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeletePost(string postId)
     {
-        try
+        var response = await _postService.DeletePostAsync(postId);
+        if (!response.Success && response.Message == "Post not found")
         {
-            var deleted = await _postRepository.DeleteAsync(postId);
-            if (!deleted)
-            {
-                return NotFound(ApiResponse<bool>.ErrorResponse("Post not found"));
-            }
-            return Ok(ApiResponse<bool>.SuccessResponse(true, "Post deleted successfully"));
+            return NotFound(response);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting post {PostId}", postId);
-            return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred while deleting post"));
-        }
+        return response.Success ? Ok(response) : StatusCode(500, response);
     }
 
     [HttpGet("posts/{postId}/comments")]
     public async Task<ActionResult<ApiResponse<List<DiscussionPostWithUserDto>>>> GetComments(string postId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        try
-        {
-            var comments = await _postRepository.GetCommentsByPostIdWithUsersAsync(postId);
-            var pagedComments = comments.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            return Ok(ApiResponse<List<DiscussionPostWithUserDto>>.SuccessResponse(pagedComments, "Comments retrieved successfully"));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving comments for post {PostId}", postId);
-            return StatusCode(500, ApiResponse<List<DiscussionPostWithUserDto>>.ErrorResponse("An error occurred while retrieving comments"));
-        }
+        var response = await _postService.GetCommentsAsync(postId, page, pageSize);
+        return response.Success ? Ok(response) : StatusCode(500, response);
     }
 }
 

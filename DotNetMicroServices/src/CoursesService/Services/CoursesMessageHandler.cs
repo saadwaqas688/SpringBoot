@@ -11,9 +11,10 @@ namespace CoursesService.Services;
 public class CoursesMessageHandler
 {
     private readonly ICourseService _courseService;
+    private readonly IDiscussionPostService _postService;
+    private readonly ILessonService _lessonService;
     private readonly ILessonRepository _lessonRepository;
     private readonly IStandardSlideRepository _slideRepository;
-    private readonly IDiscussionPostRepository _postRepository;
     private readonly IDiscussionRepository _discussionRepository;
     private readonly IQuizRepository _quizRepository;
     private readonly IQuizQuestionRepository _questionRepository;
@@ -28,9 +29,10 @@ public class CoursesMessageHandler
 
     public CoursesMessageHandler(
         ICourseService courseService,
+        IDiscussionPostService postService,
+        ILessonService lessonService,
         ILessonRepository lessonRepository,
         IStandardSlideRepository slideRepository,
-        IDiscussionPostRepository postRepository,
         IDiscussionRepository discussionRepository,
         IQuizRepository quizRepository,
         IQuizQuestionRepository questionRepository,
@@ -43,9 +45,10 @@ public class CoursesMessageHandler
         ILogger<CoursesMessageHandler> logger)
     {
         _courseService = courseService;
+        _postService = postService;
+        _lessonService = lessonService;
         _lessonRepository = lessonRepository;
         _slideRepository = slideRepository;
-        _postRepository = postRepository;
         _discussionRepository = discussionRepository;
         _quizRepository = quizRepository;
         _questionRepository = questionRepository;
@@ -381,9 +384,11 @@ public class CoursesMessageHandler
         {
             return ApiResponse<List<object>>.ErrorResponse("CourseId is required");
         }
-        var lessons = await _lessonRepository.GetByCourseIdAsync(request.CourseId);
-        var paged = lessons.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
-        return ApiResponse<List<object>>.SuccessResponse(paged.Cast<object>().ToList(), "Lessons retrieved successfully");
+        var response = await _lessonService.GetLessonsByCourseAsync(request.CourseId, request.Page, request.PageSize);
+        // Convert to generic object response for message handler
+        return ApiResponse<List<object>>.SuccessResponse(
+            response.Data?.Cast<object>().ToList() ?? new List<object>(), 
+            response.Message ?? "Lessons retrieved successfully");
     }
 
     private async Task<object> HandleGetLessonById(string messageJson)
@@ -393,12 +398,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Id is required");
         }
-        var lesson = await _lessonRepository.GetByIdAsync(request.Id);
-        if (lesson == null)
-        {
-            return ApiResponse<object>.ErrorResponse("Lesson not found");
-        }
-        return ApiResponse<object>.SuccessResponse(lesson, "Lesson retrieved successfully");
+        var response = await _lessonService.GetLessonByIdAsync(request.Id);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Lesson retrieved successfully");
     }
 
     private async Task<object> HandleCreateLesson(string messageJson)
@@ -408,35 +410,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Invalid lesson data");
         }
-        lesson.CreatedAt = DateTime.UtcNow;
-        lesson.UpdatedAt = DateTime.UtcNow;
-        var created = await _lessonRepository.CreateAsync(lesson);
-
-        // Auto-create Discussion if lesson type is "discussion"
-        if (created.Id != null && 
-            created.LessonType?.ToLower() == "discussion")
-        {
-            try
-            {
-                var discussion = new Discussion
-                {
-                    LessonId = created.Id,
-                    Description = string.Empty,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _discussionRepository.CreateAsync(discussion);
-                _logger.LogInformation("Auto-created discussion for lesson {LessonId}", created.Id);
-            }
-            catch (Exception discussionEx)
-            {
-                _logger.LogError(discussionEx, "Error auto-creating discussion for lesson {LessonId}", created.Id);
-                // Don't fail the lesson creation if discussion creation fails
-                // The discussion can be created later
-            }
-        }
-
-        return ApiResponse<object>.SuccessResponse(created, "Lesson created successfully");
+        var response = await _lessonService.CreateLessonAsync(lesson);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Lesson created successfully");
     }
 
     private async Task<object> HandleUpdateLesson(string messageJson)
@@ -446,14 +422,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Id and lesson data are required");
         }
-        request.Lesson.Id = request.Id;
-        request.Lesson.UpdatedAt = DateTime.UtcNow;
-        var updated = await _lessonRepository.UpdateAsync(request.Id, request.Lesson);
-        if (updated == null)
-        {
-            return ApiResponse<object>.ErrorResponse("Lesson not found");
-        }
-        return ApiResponse<object>.SuccessResponse(updated, "Lesson updated successfully");
+        var response = await _lessonService.UpdateLessonAsync(request.Id, request.Lesson);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Lesson updated successfully");
     }
 
     private async Task<object> HandleDeleteLesson(string messageJson)
@@ -463,8 +434,8 @@ public class CoursesMessageHandler
         {
             return ApiResponse<bool>.ErrorResponse("Id is required");
         }
-        var deleted = await _lessonRepository.DeleteAsync(request.Id);
-        return ApiResponse<bool>.SuccessResponse(deleted, "Lesson deleted successfully");
+        var response = await _lessonService.DeleteLessonAsync(request.Id);
+        return response;
     }
 
     // Slide handlers
@@ -552,9 +523,11 @@ public class CoursesMessageHandler
         {
             return ApiResponse<List<object>>.ErrorResponse("LessonId is required");
         }
-        var posts = await _postRepository.GetPostsByLessonIdAsync(request.LessonId);
-        var paged = posts.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
-        return ApiResponse<List<object>>.SuccessResponse(paged.Cast<object>().ToList(), "Posts retrieved successfully");
+        var response = await _postService.GetPostsByLessonAsync(request.LessonId, request.Page, request.PageSize);
+        // Convert to generic object response for message handler
+        return ApiResponse<List<object>>.SuccessResponse(
+            response.Data?.Cast<object>().ToList() ?? new List<object>(), 
+            response.Message ?? "Posts retrieved successfully");
     }
 
     private async Task<object> HandleGetPostById(string messageJson)
@@ -564,12 +537,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Id is required");
         }
-        var post = await _postRepository.GetByIdAsync(request.Id);
-        if (post == null)
-        {
-            return ApiResponse<object>.ErrorResponse("Post not found");
-        }
-        return ApiResponse<object>.SuccessResponse(post, "Post retrieved successfully");
+        var response = await _postService.GetPostByIdAsync(request.Id);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Post retrieved successfully");
     }
 
     private async Task<object> HandleCreatePost(string messageJson)
@@ -579,10 +549,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Invalid post data");
         }
-        post.CreatedAt = DateTime.UtcNow;
-        post.UpdatedAt = DateTime.UtcNow;
-        var created = await _postRepository.CreateAsync(post);
-        return ApiResponse<object>.SuccessResponse(created, "Post created successfully");
+        var response = await _postService.CreatePostAsync(post);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Post created successfully");
     }
 
     private async Task<object> HandleUpdatePost(string messageJson)
@@ -592,14 +561,9 @@ public class CoursesMessageHandler
         {
             return ApiResponse<object>.ErrorResponse("Id and post data are required");
         }
-        request.Post.Id = request.Id;
-        request.Post.UpdatedAt = DateTime.UtcNow;
-        var updated = await _postRepository.UpdateAsync(request.Id, request.Post);
-        if (updated == null)
-        {
-            return ApiResponse<object>.ErrorResponse("Post not found");
-        }
-        return ApiResponse<object>.SuccessResponse(updated, "Post updated successfully");
+        var response = await _postService.UpdatePostAsync(request.Id, request.Post);
+        // Convert to generic object response for message handler
+        return ApiResponse<object>.SuccessResponse(response.Data, response.Message ?? "Post updated successfully");
     }
 
     private async Task<object> HandleDeletePost(string messageJson)
@@ -609,8 +573,8 @@ public class CoursesMessageHandler
         {
             return ApiResponse<bool>.ErrorResponse("Id is required");
         }
-        var deleted = await _postRepository.DeleteAsync(request.Id);
-        return ApiResponse<bool>.SuccessResponse(deleted, "Post deleted successfully");
+        var response = await _postService.DeletePostAsync(request.Id);
+        return response;
     }
 
     private async Task<object> HandleGetComments(string messageJson)
@@ -620,9 +584,11 @@ public class CoursesMessageHandler
         {
             return ApiResponse<List<object>>.ErrorResponse("PostId is required");
         }
-        var comments = await _postRepository.GetCommentsByPostIdAsync(request.PostId);
-        var paged = comments.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize).ToList();
-        return ApiResponse<List<object>>.SuccessResponse(paged.Cast<object>().ToList(), "Comments retrieved successfully");
+        var response = await _postService.GetCommentsAsync(request.PostId, request.Page, request.PageSize);
+        // Convert to generic object response for message handler
+        return ApiResponse<List<object>>.SuccessResponse(
+            response.Data?.Cast<object>().ToList() ?? new List<object>(), 
+            response.Message ?? "Comments retrieved successfully");
     }
 
     // Quiz handlers

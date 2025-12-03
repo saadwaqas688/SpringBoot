@@ -8,13 +8,13 @@ This document outlines the complete structure of the Todo Microservices project.
 DotNetMicroServices/
 ├── src/                          # Source code for microservices
 │   ├── Gateway/                  # API Gateway Service
-│   ├── TodoService/             # Todo Microservice
-│   └── UserService/              # User Microservice
+│   ├── UserAccountService/       # User Account Microservice
+│   └── CoursesService/           # Courses Microservice
 ├── libs/                         # Shared libraries
 │   └── Shared/                   # Shared library with common code
 ├── Dockerfile.gateway            # Dockerfile for Gateway
-├── Dockerfile.todoservice        # Dockerfile for TodoService
-├── Dockerfile.userservice        # Dockerfile for UserService
+├── Dockerfile.useraccountservice # Dockerfile for UserAccountService
+├── Dockerfile.coursesservice.dev # Dockerfile for CoursesService
 ├── docker-compose.yml            # Docker Compose configuration
 ├── TodoMicroservices.slnx        # Solution file
 ├── README.md                     # Main documentation
@@ -26,13 +26,14 @@ DotNetMicroServices/
 ```
 Gateway/
 ├── Controllers/
-│   ├── TodoController.cs        # Routes todo requests to TodoService
-│   └── UserController.cs        # Routes user requests to UserService
+│   ├── AuthController.cs        # Routes authentication requests to UserAccountService
+│   ├── CoursesController.cs     # Routes course requests to CoursesService
+│   └── AdminController.cs       # Admin endpoints
 ├── Services/
-│   ├── ITodoGatewayService.cs   # Interface for Todo gateway service
-│   ├── TodoGatewayService.cs   # HTTP client service for TodoService
-│   ├── IUserGatewayService.cs  # Interface for User gateway service
-│   └── UserGatewayService.cs   # HTTP client service for UserService
+│   ├── IUserAccountGatewayService.cs   # Interface for UserAccount gateway service
+│   ├── UserAccountGatewayService.cs    # RabbitMQ client service for UserAccountService
+│   ├── ICoursesGatewayService.cs       # Interface for Courses gateway service
+│   └── CoursesGatewayService.cs        # RabbitMQ client service for CoursesService
 ├── Middleware/                  # Custom middleware (empty, ready for use)
 ├── Filters/                     # Exception filters (empty, ready for use)
 ├── Program.cs                   # Application entry point
@@ -40,42 +41,52 @@ Gateway/
 └── Gateway.csproj              # Project file
 ```
 
-## TodoService (src/TodoService/)
+## UserAccountService (src/UserAccountService/)
 
 ```
-TodoService/
+UserAccountService/
 ├── Controllers/
-│   └── TodoController.cs        # Todo CRUD endpoints
+│   └── AuthController.cs        # Authentication endpoints
 ├── Services/
-│   ├── ITodoService.cs          # Todo service interface
-│   └── TodoService.cs           # Todo business logic (in-memory)
+│   ├── IAuthService.cs          # Auth service interface
+│   ├── AuthService.cs           # Authentication business logic
+│   └── UserAccountMessageHandler.cs  # RabbitMQ message handler
 ├── Models/
-│   └── Todo.cs                  # Todo model
+│   └── UserAccount.cs           # User account model
 ├── DTOs/
-│   ├── CreateTodoDto.cs         # DTO for creating todos
-│   └── UpdateTodoDto.cs         # DTO for updating todos
+│   ├── SignUpDto.cs             # DTO for user signup
+│   └── SignInDto.cs             # DTO for user signin
+├── Data/
+│   └── UserAccountDbContext.cs  # MongoDB context
 ├── Program.cs                   # Application entry point
 ├── appsettings.json            # Configuration
-└── TodoService.csproj          # Project file
+└── UserAccountService.csproj    # Project file
 ```
 
-## UserService (src/UserService/)
+## CoursesService (src/CoursesService/)
 
 ```
-UserService/
+CoursesService/
 ├── Controllers/
-│   └── UserController.cs        # User CRUD endpoints
+│   ├── CoursesController.cs     # Course CRUD endpoints
+│   ├── LessonsController.cs     # Lesson endpoints
+│   ├── QuizzesController.cs     # Quiz endpoints
+│   └── ProgressController.cs   # Progress tracking endpoints
 ├── Services/
-│   ├── IUserService.cs          # User service interface
-│   └── UserService.cs           # User business logic (in-memory)
+│   ├── ICourseService.cs        # Course service interface
+│   ├── CourseService.cs         # Course business logic
+│   └── CoursesMessageHandler.cs # RabbitMQ message handler
 ├── Models/
-│   └── User.cs                  # User model
-├── DTOs/
-│   ├── CreateUserDto.cs         # DTO for creating users
-│   └── UpdateUserDto.cs         # DTO for updating users
+│   ├── Course.cs               # Course model
+│   ├── Lesson.cs               # Lesson model
+│   └── Quiz.cs                 # Quiz model
+├── Repositories/
+│   └── [Various repositories]  # MongoDB repositories
+├── Data/
+│   └── CoursesDbContext.cs      # MongoDB context
 ├── Program.cs                   # Application entry point
 ├── appsettings.json            # Configuration
-└── UserService.csproj          # Project file
+└── CoursesService.csproj        # Project file
 ```
 
 ## Shared Library (libs/Shared/)
@@ -108,8 +119,8 @@ Shared/
 ### 1. Microservices Architecture
 
 - **Gateway**: Single entry point for all client requests
-- **TodoService**: Handles all todo-related operations
-- **UserService**: Handles all user-related operations
+- **UserAccountService**: Handles user authentication, authorization, and account management
+- **CoursesService**: Handles courses, lessons, quizzes, and progress tracking
 
 ### 2. Service Communication
 
@@ -138,8 +149,8 @@ Shared/
 ## Port Configuration
 
 - **Gateway**: 5000
-- **TodoService**: 5001
-- **UserService**: 5002
+- **UserAccountService**: 5003
+- **CoursesService**: 5004
 
 ## Data Storage
 

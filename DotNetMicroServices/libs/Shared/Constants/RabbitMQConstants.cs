@@ -3,21 +3,8 @@ namespace Shared.Constants;
 public static class RabbitMQConstants
 {
     // Queue Names
-    public const string UserServiceQueue = "USER_SERVICE_QUEUE";
     public const string UserAccountServiceQueue = "USER_ACCOUNT_SERVICE_QUEUE";
     public const string CoursesServiceQueue = "COURSES_SERVICE_QUEUE";
-    
-    // Message Patterns - User Service
-    public static class User
-    {
-        public const string HealthCheck = "user.health-check";
-        public const string GetAll = "user.get-all";
-        public const string GetById = "user.get-by-id";
-        public const string GetByEmail = "user.get-by-email";
-        public const string Create = "user.create";
-        public const string Update = "user.update";
-        public const string Delete = "user.delete";
-    }
     
     // Message Patterns - UserAccount Service
     public static class UserAccount

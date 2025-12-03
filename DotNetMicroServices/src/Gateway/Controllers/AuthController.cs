@@ -34,8 +34,19 @@ public class AuthController : ControllerBase
     [HttpPost("signin")]
     public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignIn([FromBody] SignInDto dto)
     {
-        var response = await _userAccountGatewayService.SignInAsync(dto);
-        return StatusCode(response.Success ? 200 : 401, response);
+        try
+        {
+            var response = await _userAccountGatewayService.SignInAsync(dto);
+            return StatusCode(response.Success ? 200 : 401, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during signin");
+            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse(
+                ex.Message.Contains("RabbitMQ") || ex.Message.Contains("BrokerUnreachable")
+                    ? "Service temporarily unavailable. RabbitMQ connection failed. Please check if RabbitMQ is running."
+                    : "An unexpected error occurred during signin"));
+        }
     }
 
     [Authorize]

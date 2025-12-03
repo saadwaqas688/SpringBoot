@@ -27,10 +27,7 @@ export const ExpandableListPreview: React.FC<ExpandableListPreviewProps> = ({
   return (
     <Box>
       {items.map((item, index) => {
-        const isExpanded =
-          focusMode && expandedItemIndex === index
-            ? true
-            : !focusMode && expandedItemIndex === index;
+        const isExpanded = expandedItemIndex === index;
 
         return (
           <Box
@@ -103,4 +100,3 @@ export const ExpandableListPreview: React.FC<ExpandableListPreviewProps> = ({
     </Box>
   );
 };
-

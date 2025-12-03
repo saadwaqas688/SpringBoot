@@ -1025,15 +1025,9 @@ export default function CourseDetailPage() {
   };
 
   const handleToggleExpandableItem = (index: number) => {
-    if (slideEditor.focusMode) {
-      slideEditor.setExpandedItemIndex(
-        slideEditor.expandedItemIndex === index ? null : index
-      );
-    } else {
-      slideEditor.setExpandedItemIndex(
-        slideEditor.expandedItemIndex === index ? null : index
-      );
-    }
+    slideEditor.setExpandedItemIndex(
+      slideEditor.expandedItemIndex === index ? null : index
+    );
   };
 
   const handleAddImageToCollection = () => {

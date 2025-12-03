@@ -1,14 +1,14 @@
 # Todo Microservices - .NET Implementation
 
-A learning project demonstrating a microservices architecture using .NET, similar to the NestJS microservices structure. This project implements a Todo List application with three microservices.
+A learning project demonstrating a microservices architecture using .NET, similar to the NestJS microservices structure. This project implements a Course Management application with multiple microservices.
 
 ## Architecture
 
 This project follows a microservices architecture pattern with:
 
 - **Gateway Service** (Port 5000): API Gateway that routes requests to appropriate microservices
-- **Todo Service** (Port 5001): Manages todo items (CRUD operations)
-- **User Service** (Port 5002): Manages user accounts (CRUD operations)
+- **UserAccount Service** (Port 5003): Manages user accounts, authentication, and authorization
+- **Courses Service** (Port 5004): Manages courses, lessons, quizzes, and progress tracking
 - **Shared Library**: Common models, DTOs, utilities, and services shared across microservices
 
 ## Project Structure
@@ -21,15 +21,15 @@ DotNetMicroServices/
 │   │   ├── Services/         # Gateway Services (HTTP clients)
 │   │   ├── Middleware/       # Custom middleware
 │   │   └── Filters/          # Exception filters
-│   ├── TodoService/          # Todo Microservice
-│   │   ├── Controllers/      # Todo API Controllers
-│   │   ├── Services/         # Todo Business Logic
-│   │   ├── Models/           # Todo Models
+│   ├── UserAccountService/  # User Account Microservice
+│   │   ├── Controllers/      # User Account API Controllers
+│   │   ├── Services/         # User Account Business Logic
+│   │   ├── Models/           # User Account Models
 │   │   └── DTOs/             # Data Transfer Objects
-│   └── UserService/          # User Microservice
-│       ├── Controllers/      # User API Controllers
-│       ├── Services/         # User Business Logic
-│       ├── Models/           # User Models
+│   └── CoursesService/       # Courses Microservice
+│       ├── Controllers/      # Courses API Controllers
+│       ├── Services/         # Courses Business Logic
+│       ├── Models/           # Courses Models
 │       └── DTOs/             # Data Transfer Objects
 ├── libs/
 │   └── Shared/               # Shared Library
@@ -38,10 +38,10 @@ DotNetMicroServices/
 │       ├── Common/           # Common classes (ApiResponse, etc.)
 │       ├── Constants/       # Constants
 │       ├── Utils/            # Utility functions
-│       └── Services/        # Shared Services (HttpClient)
+│       └── Services/        # Shared Services (HttpClient, RabbitMQ)
 ├── Dockerfile.gateway        # Gateway Dockerfile
-├── Dockerfile.todoservice    # TodoService Dockerfile
-├── Dockerfile.userservice    # UserService Dockerfile
+├── Dockerfile.useraccountservice    # UserAccountService Dockerfile
+├── Dockerfile.coursesservice.dev   # CoursesService Dockerfile
 └── docker-compose.yml        # Docker Compose configuration
 ```
 
@@ -75,17 +75,17 @@ DotNetMicroServices/
    dotnet run
    ```
 
-   Terminal 2 - TodoService:
+   Terminal 2 - UserAccountService:
 
    ```bash
-   cd src/TodoService
+   cd src/UserAccountService
    dotnet run
    ```
 
-   Terminal 3 - UserService:
+   Terminal 3 - CoursesService:
 
    ```bash
-   cd src/UserService
+   cd src/CoursesService
    dotnet run
    ```
 
@@ -120,56 +120,68 @@ DotNetMicroServices/
 - `PUT /api/todo/{id}` - Update a todo
 - `DELETE /api/todo/{id}` - Delete a todo
 
-#### User Endpoints
+#### User Account Endpoints
 
-- `GET /api/user` - Get all users
-- `GET /api/user/{id}` - Get user by ID
-- `GET /api/user/email/{email}` - Get user by email
-- `POST /api/user` - Create a new user
-- `PUT /api/user/{id}` - Update a user
-- `DELETE /api/user/{id}` - Delete a user
+- `POST /api/auth/signup` - Sign up a new user
+- `POST /api/auth/signin` - Sign in a user
+- `PUT /api/auth/profile` - Update user profile (requires authentication)
+- `GET /api/auth/profile` - Get current user profile (requires authentication)
+
+#### Courses Endpoints
+
+- `GET /api/courses` - Get all courses
+- `GET /api/courses/{id}` - Get course by ID
+- `POST /api/courses` - Create a new course
+- `PUT /api/courses/{id}` - Update a course
+- `DELETE /api/courses/{id}` - Delete a course
 
 ### Direct Service Access
 
-#### TodoService (http://localhost:5001)
+#### UserAccountService (http://localhost:5003)
 
-- Same endpoints as Gateway `/api/todo/*`
+- Authentication and user account management endpoints
 
-#### UserService (http://localhost:5002)
+#### CoursesService (http://localhost:5004)
 
-- Same endpoints as Gateway `/api/user/*`
+- Courses, lessons, quizzes, and progress tracking endpoints
 
 ## Example API Calls
 
-### Create a User
+### Sign Up a User
 
 ```bash
-curl -X POST http://localhost:5000/api/user \
+curl -X POST http://localhost:5000/api/auth/signup \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "johndoe",
     "email": "john@example.com",
+    "password": "SecurePassword123!",
     "firstName": "John",
     "lastName": "Doe"
   }'
 ```
 
-### Create a Todo
+### Sign In
 
 ```bash
-curl -X POST http://localhost:5000/api/todo \
+curl -X POST http://localhost:5000/api/auth/signin \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Learn Microservices",
-    "description": "Study .NET microservices architecture",
-    "userId": "<user-id-from-previous-response>"
+    "email": "john@example.com",
+    "password": "SecurePassword123!"
   }'
 ```
 
-### Get All Todos for a User
+### Create a Course (requires authentication)
 
 ```bash
-curl http://localhost:5000/api/todo?userId=<user-id>
+curl -X POST http://localhost:5000/api/courses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-from-signin>" \
+  -d '{
+    "title": "Introduction to Microservices",
+    "description": "Learn microservices architecture",
+    "status": "published"
+  }'
 ```
 
 ## Swagger Documentation
@@ -177,8 +189,8 @@ curl http://localhost:5000/api/todo?userId=<user-id>
 When running in Development mode, Swagger UI is available at:
 
 - Gateway: http://localhost:5000/swagger
-- TodoService: http://localhost:5001/swagger
-- UserService: http://localhost:5002/swagger
+- UserAccountService: http://localhost:5003/swagger
+- CoursesService: http://localhost:5004/swagger
 
 ## Key Features
 

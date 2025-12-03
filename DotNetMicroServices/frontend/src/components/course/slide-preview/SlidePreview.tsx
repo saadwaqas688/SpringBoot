@@ -53,7 +53,8 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
   const isSingleVideo = slideType === "single-video";
   const isVideoCollection = slideType === "video-collection";
   const isExpandableList = slideType === "expandable-list";
-  const isBulletedList = slideType === "bulleted-list" || slideType === "text" || !slideType;
+  const isBulletedList =
+    slideType === "bulleted-list" || slideType === "text" || !slideType;
 
   return (
     <Box
@@ -83,7 +84,9 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
         {slideTitle}
       </Typography>
 
-      <Box sx={{ maxWidth: { xs: "100%", md: 600 }, mx: "auto", width: "100%" }}>
+      <Box
+        sx={{ maxWidth: { xs: "100%", md: 600 }, mx: "auto", width: "100%" }}
+      >
         {isSingleImage && (
           <SingleImagePreview
             imageUrl={imageUrl || ""}
@@ -120,7 +123,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
           <ExpandableListPreview
             items={expandableListItems}
             focusMode={focusMode || false}
-            expandedItemIndex={expandedItemIndex || null}
+            expandedItemIndex={expandedItemIndex ?? null}
             promptText={promptText || ""}
             onToggleItem={onToggleExpandableItem}
           />
@@ -133,4 +136,3 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
     </Box>
   );
 };
-

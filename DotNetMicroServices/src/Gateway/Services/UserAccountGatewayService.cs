@@ -64,8 +64,19 @@ public class UserAccountGatewayService : IUserAccountGatewayService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling UserAccountService for signin. Email: {Email}", dto.Email);
-            return ApiResponse<AuthResponseDto>.ErrorResponse($"An error occurred during signin: {ex.Message}");
+            _logger.LogError(ex, "Error calling UserAccountService for signin. Email: {Email}, Exception Type: {ExceptionType}", 
+                dto.Email, ex.GetType().Name);
+            
+            // Check if it's a RabbitMQ connection issue
+            var errorMessage = ex.Message.Contains("BrokerUnreachable") || 
+                              ex.Message.Contains("RabbitMQ") || 
+                              ex.Message.Contains("Connection") ||
+                              ex.GetType().Name.Contains("Broker") ||
+                              ex.GetType().Name.Contains("RabbitMQ")
+                ? "Service temporarily unavailable. RabbitMQ connection failed. Please check if RabbitMQ is running on localhost:5672."
+                : $"An error occurred during signin: {ex.Message}";
+            
+            return ApiResponse<AuthResponseDto>.ErrorResponse(errorMessage);
         }
     }
 
