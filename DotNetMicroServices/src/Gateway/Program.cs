@@ -1,9 +1,6 @@
-using Gateway.Services;
-using Shared.Services;
-using Shared.Common;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Gateway.Infrastructure.Services;
+using Shared.Application.Extensions;
+using Shared.Core.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +12,7 @@ builder.Services.AddControllers(options =>
     // - Validates DTOs using Data Annotations before controller actions execute
     // - Returns consistent ApiResponse format for validation errors
     // - Eliminates need for manual ModelState.IsValid checks in controllers
-    options.Filters.Add<Shared.Filters.ValidateModelAttribute>();
+    options.Filters.Add<Shared.Application.Filters.ValidateModelAttribute>();
 })
     .AddJsonOptions(options =>
     {
@@ -27,23 +24,13 @@ builder.Services.AddControllers(options =>
     {
         // Register TransformModelBinderProvider to enable [Transform] attribute
         // This allows field transformation similar to NestJS's @Transform decorator
-        options.ModelBinderProviders.Insert(0, new Shared.ModelBinders.TransformModelBinderProvider());
+        options.ModelBinderProviders.Insert(0, new Shared.Application.ModelBinders.TransformModelBinderProvider());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Register RabbitMQ Service
-var rabbitMQConfig = builder.Configuration.GetSection("RabbitMQ");
-builder.Services.AddSingleton<IRabbitMQService>(sp =>
-{
-    var logger = sp.GetRequiredService<ILogger<RabbitMQService>>();
-    return new RabbitMQService(
-        rabbitMQConfig["HostName"] ?? "localhost",
-        int.Parse(rabbitMQConfig["Port"] ?? "5672"),
-        rabbitMQConfig["UserName"] ?? "guest",
-        rabbitMQConfig["Password"] ?? "guest",
-        logger);
-});
+// Register RabbitMQ Service using Options pattern
+builder.Services.AddRabbitMQService(builder.Configuration);
 
 // Register HttpClient for direct HTTP calls (for file uploads)
 builder.Services.AddHttpClient();
@@ -53,54 +40,25 @@ builder.Services.AddScoped<IUserAccountGatewayService, UserAccountGatewayService
 builder.Services.AddScoped<ICoursesGatewayService, CoursesGatewayService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-// JWT Authentication Configuration (same as UserAccountService)
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";
-var issuer = jwtSettings["Issuer"] ?? "UserAccountService";
-var audience = jwtSettings["Audience"] ?? "UserAccountService";
+// JWT Authentication Configuration using Options pattern
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer,
-        ValidAudience = audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
-    };
-});
-
-builder.Services.AddAuthorization();
-
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+// CORS Configuration using Options pattern
+builder.Services.AddCorsPolicy(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+// Global exception handler must be first
+app.UseGlobalExceptionHandler();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
 
 app.UseRouting();
-app.UseCors("AllowAll");
+app.UseCors("DefaultPolicy"); // Changed from "AllowAll" to "DefaultPolicy"
 app.UseAuthentication();
 app.UseAuthorization();
 

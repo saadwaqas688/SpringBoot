@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using UserAccountService.DTOs;
+using UserAccountService.Application.DTOs;
 using UserAccountService.Models;
-using UserAccountService.Services;
-using Shared.Common;
+using UserAccountService.Application.Services;
+using UserAccountService.Infrastructure.Services;
+using Shared.Core.Common;
 using System.ComponentModel.DataAnnotations;
 
 namespace UserAccountService.Controllers;
@@ -28,96 +29,84 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("signup")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignUp([FromBody] SignUpDto dto)
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignUp([FromBody] SignUpDto dto, CancellationToken cancellationToken = default)
     {
-        try
+        // Exception handling is now done by GlobalExceptionHandlerMiddleware
+        // Check if user already exists
+        var existingUser = await _userAccountService.GetUserByEmailAsync(dto.Email);
+        if (existingUser != null)
         {
-            // Check if user already exists
-            var existingUser = await _userAccountService.GetUserByEmailAsync(dto.Email);
-            if (existingUser != null)
+            return BadRequest(ApiResponse<AuthResponseDto>.ErrorResponse("User with this email already exists"));
+        }
+
+        // Create new user
+        var user = new UserAccount
+        {
+            Name = dto.Name,
+            Email = dto.Email,
+            PasswordHash = _authService.HashPassword(dto.Password),
+            Image = dto.Image,
+            Role = "user" // Default role
+        };
+
+        var createdUser = await _userAccountService.CreateUserAsync(user);
+
+        // Generate JWT token
+        var token = _authService.GenerateJwtToken(createdUser);
+
+        var response = new AuthResponseDto
+        {
+            Token = token,
+            User = new UserInfoDto
             {
-                return BadRequest(ApiResponse<AuthResponseDto>.ErrorResponse("User with this email already exists"));
+                Id = createdUser.Id ?? string.Empty,
+                Name = createdUser.Name,
+                Email = createdUser.Email,
+                Image = createdUser.Image,
+                Role = createdUser.Role,
+                Status = createdUser.Status,
+                CreatedAt = createdUser.CreatedAt
             }
+        };
 
-            // Create new user
-            var user = new UserAccount
-            {
-                Name = dto.Name,
-                Email = dto.Email,
-                PasswordHash = _authService.HashPassword(dto.Password),
-                Image = dto.Image,
-                Role = "user" // Default role
-            };
-
-            var createdUser = await _userAccountService.CreateUserAsync(user);
-
-            // Generate JWT token
-            var token = _authService.GenerateJwtToken(createdUser);
-
-            var response = new AuthResponseDto
-            {
-                Token = token,
-                User = new UserInfoDto
-                {
-                    Id = createdUser.Id ?? string.Empty,
-                    Name = createdUser.Name,
-                    Email = createdUser.Email,
-                    Image = createdUser.Image,
-                    Role = createdUser.Role,
-                    Status = createdUser.Status,
-                    CreatedAt = createdUser.CreatedAt
-                }
-            };
-
-            return Ok(ApiResponse<AuthResponseDto>.SuccessResponse(response, "User registered successfully"));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during signup");
-            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during signup"));
-        }
+        return CreatedAtAction(nameof(GetCurrentUser), new { }, ApiResponse<AuthResponseDto>.SuccessResponse(response, "User registered successfully")); // 201 Created
     }
 
     [HttpPost("signin")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignIn([FromBody] SignInDto dto)
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignIn([FromBody] SignInDto dto, CancellationToken cancellationToken = default)
     {
-        try
+        // Exception handling is now done by GlobalExceptionHandlerMiddleware
+        var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
+        if (user == null)
         {
-            var user = await _userAccountService.GetUserByEmailAsync(dto.Email);
-            if (user == null)
-            {
-                return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password"));
-            }
-
-            // Verify password
-            if (!_authService.VerifyPassword(dto.Password, user.PasswordHash))
-            {
-                return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password"));
-            }
-
-            // Generate JWT token
-            var token = _authService.GenerateJwtToken(user);
-
-            var response = new AuthResponseDto
-            {
-                Token = token,
-                User = new UserInfoDto
-                {
-                    Id = user.Id ?? string.Empty,
-                    Name = user.Name,
-                    Email = user.Email,
-                    Image = user.Image,
-                    Role = user.Role
-                }
-            };
-
-            return Ok(ApiResponse<AuthResponseDto>.SuccessResponse(response, "Sign in successful"));
+            return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password"));
         }
-        catch (Exception ex)
+
+        // Verify password
+        if (!_authService.VerifyPassword(dto.Password, user.PasswordHash))
         {
-            _logger.LogError(ex, "Error during signin");
-            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse("An error occurred during signin"));
+            return Unauthorized(ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password"));
         }
+
+        // Generate JWT token
+        var token = _authService.GenerateJwtToken(user);
+
+        var response = new AuthResponseDto
+        {
+            Token = token,
+            User = new UserInfoDto
+            {
+                Id = user.Id ?? string.Empty,
+                Name = user.Name,
+                Email = user.Email,
+                Image = user.Image,
+                Role = user.Role,
+                Status = user.Status,
+                CreatedAt = user.CreatedAt
+            }
+        };
+
+        return Ok(ApiResponse<AuthResponseDto>.SuccessResponse(response, "Sign in successful"));
     }
 
     [Authorize]
@@ -369,7 +358,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("users")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto)
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto, CancellationToken cancellationToken = default)
     {
         // Note: Model validation is now handled automatically by ValidateModelAttribute filter
         // No need for manual ModelState.IsValid checks - validation happens before this method executes
@@ -420,7 +409,7 @@ public class AuthController : ControllerBase
                 PostalCode = createdUser.PostalCode
             };
 
-            return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "User created successfully"));
+            return CreatedAtAction(nameof(GetUsers), new { }, ApiResponse<UserInfoDto>.SuccessResponse(response, "User created successfully")); // 201 Created
         }
         catch (Exception ex)
         {
@@ -503,12 +492,30 @@ public class AuthController : ControllerBase
             }
 
             var updated = await _userAccountService.UpdateUserStatusAsync(id, dto.Status);
-            if (!updated)
+            if (updated == null)
             {
-                return NotFound(ApiResponse<bool>.ErrorResponse("User not found"));
+                return NotFound(ApiResponse<UserInfoDto>.ErrorResponse("User not found"));
             }
 
-            return Ok(ApiResponse<bool>.SuccessResponse(true, "User status updated successfully"));
+            var response = new UserInfoDto
+            {
+                Id = updated.Id ?? string.Empty,
+                Name = updated.Name,
+                Email = updated.Email,
+                Image = updated.Image,
+                Role = updated.Role,
+                Status = updated.Status,
+                CreatedAt = updated.CreatedAt,
+                Gender = updated.Gender,
+                DateOfBirth = updated.DateOfBirth,
+                MobilePhone = updated.MobilePhone,
+                Country = updated.Country,
+                State = updated.State,
+                City = updated.City,
+                PostalCode = updated.PostalCode
+            };
+
+            return Ok(ApiResponse<UserInfoDto>.SuccessResponse(response, "User status updated successfully"));
         }
         catch (Exception ex)
         {

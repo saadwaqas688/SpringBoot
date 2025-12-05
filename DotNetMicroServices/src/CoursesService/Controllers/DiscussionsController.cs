@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
 using CoursesService.DTOs;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -256,4 +256,5 @@ public class DiscussionsController : ControllerBase
         }
     }
 }
+
 

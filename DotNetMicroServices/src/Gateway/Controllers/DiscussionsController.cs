@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Gateway.Services;
-using Shared.Common;
+using Gateway.Infrastructure.Services;
+using Shared.Core.Common;
 
 namespace Gateway.Controllers;
 
@@ -96,4 +96,6 @@ public class DiscussionsController : ControllerBase
         return StatusCode(response.Success ? 200 : 404, response);
     }
 }
+
+
 

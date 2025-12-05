@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -259,5 +259,6 @@ public class CompleteSlideDto
     public string SlideId { get; set; } = string.Empty;
     public int TimeSpent { get; set; }
 }
+
 
 

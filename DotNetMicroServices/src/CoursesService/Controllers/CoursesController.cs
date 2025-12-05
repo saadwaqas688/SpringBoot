@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Services;
 using CoursesService.Repositories;
-using Shared.Common;
+using Shared.Core.Common;
 using System.Linq;
 
 namespace CoursesService.Controllers;
@@ -250,4 +250,5 @@ public class CourseUserProgressDto
     public DateTime AssignedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 }
+
 

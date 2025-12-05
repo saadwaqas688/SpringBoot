@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -128,5 +128,6 @@ public class UserProgressSummaryDto
     public int CompletedLessons { get; set; }
     public int AverageProgress { get; set; }
 }
+
 
 

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
-using Shared.Common;
+using Shared.Core.Common;
 using MongoDB.Driver;
 
 namespace CoursesService.Controllers;
@@ -220,5 +220,6 @@ public class QuizResultDto
     public int WrongAnswers { get; set; }
     public int TotalQuestions { get; set; }
 }
+
 
 

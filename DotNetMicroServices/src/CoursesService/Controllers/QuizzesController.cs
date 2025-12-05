@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
 using CoursesService.Services;
-using Shared.Common;
+using Shared.Core.Common;
 using System.Linq;
 
 namespace CoursesService.Controllers;
@@ -282,5 +282,6 @@ public class QuizUploadResponse
     public int QuizScore { get; set; }
     public string Message { get; set; } = string.Empty;
 }
+
 
 

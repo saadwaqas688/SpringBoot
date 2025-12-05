@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Services;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -67,5 +67,6 @@ public class LessonsController : ControllerBase
         return response.Success ? Ok(response) : StatusCode(500, response);
     }
 }
+
 
 

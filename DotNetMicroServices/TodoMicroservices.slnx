@@ -4,5 +4,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Gateway/Gateway.csproj" />
+    <Project Path="src/UserAccountService/UserAccountService.csproj" />
+    <Project Path="src/CoursesService/CoursesService.csproj" />
   </Folder>
 </Solution>

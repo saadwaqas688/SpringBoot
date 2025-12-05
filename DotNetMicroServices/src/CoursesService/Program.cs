@@ -1,9 +1,10 @@
-using CoursesService.Services;
-using CoursesService.Data;
-using CoursesService.Repositories;
-using Shared.Services;
-using Shared.Constants;
+using CoursesService.Infrastructure.Data;
+using CoursesService.Extensions;
+using CoursesService.Application.Services;
+using CoursesService.Infrastructure.Services;
 using MongoDB.Driver;
+using Shared.Constants;
+using Shared.Application.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,183 +16,63 @@ builder.Services.AddControllers(options =>
     // - Validates DTOs using Data Annotations before controller actions execute
     // - Returns consistent ApiResponse format for validation errors
     // - Eliminates need for manual ModelState.IsValid checks in controllers
-    options.Filters.Add<Shared.Filters.ValidateModelAttribute>();
+    options.Filters.Add<Shared.Application.Filters.ValidateModelAttribute>();
 })
     .AddMvcOptions(options =>
     {
         // Register TransformModelBinderProvider to enable [Transform] attribute
         // This allows field transformation similar to NestJS's @Transform decorator
-        options.ModelBinderProviders.Insert(0, new Shared.ModelBinders.TransformModelBinderProvider());
+        options.ModelBinderProviders.Insert(0, new Shared.Application.ModelBinders.TransformModelBinderProvider());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
-builder.Services.AddHttpClient();
 
-// MongoDB Configuration
-var mongoConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "mongodb://localhost:27017";
-var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "CoursesDB";
+// MongoDB Configuration using Options pattern
+builder.Services.AddCoursesMongoDb(builder.Configuration);
 
-builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
-builder.Services.AddScoped<CoursesDbContext>(sp =>
-{
-    var mongoClient = sp.GetRequiredService<IMongoClient>();
-    return new CoursesDbContext(mongoClient, mongoDatabaseName);
-});
+// Register Repositories and Services using extension methods
+builder.Services.AddCoursesRepositories();
+builder.Services.AddCoursesServices();
 
-// Register Repositories
-builder.Services.AddScoped<ICourseRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<CourseRepository>>();
-    return new CourseRepository(context.Courses, logger);
-});
+// Register RabbitMQ Service using Options pattern
+builder.Services.AddRabbitMQService(builder.Configuration);
 
-builder.Services.AddScoped<ILessonRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<LessonRepository>>();
-    return new LessonRepository(context.Lessons, logger);
-});
-
-builder.Services.AddScoped<IStandardSlideRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<StandardSlideRepository>>();
-    return new StandardSlideRepository(context.StandardSlides, logger);
-});
-
-builder.Services.AddScoped<IDiscussionPostRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<DiscussionPostRepository>>();
-    return new DiscussionPostRepository(context.DiscussionPosts, logger);
-});
-
-builder.Services.AddScoped<IDiscussionRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<DiscussionRepository>>();
-    return new DiscussionRepository(context.Discussions, logger);
-});
-
-builder.Services.AddScoped<IQuizRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<QuizRepository>>();
-    return new QuizRepository(context.Quizzes, logger);
-});
-
-builder.Services.AddScoped<IQuizQuestionRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<QuizQuestionRepository>>();
-    return new QuizQuestionRepository(context.QuizQuestions, logger);
-});
-
-// Register Services
-builder.Services.AddScoped<IQuizFileParserService, QuizFileParserService>();
-builder.Services.AddScoped<IDiscussionPostService, DiscussionPostService>();
-builder.Services.AddScoped<ILessonService, LessonService>();
-
-builder.Services.AddScoped<IUserCourseRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserCourseRepository>>();
-    return new UserCourseRepository(context.UserCourses, logger);
-});
-
-builder.Services.AddScoped<IUserLessonProgressRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserLessonProgressRepository>>();
-    return new UserLessonProgressRepository(context.UserLessonProgress, logger);
-});
-
-builder.Services.AddScoped<IUserSlideProgressRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserSlideProgressRepository>>();
-    return new UserSlideProgressRepository(context.UserSlideProgress, logger);
-});
-
-builder.Services.AddScoped<IUserActivityLogRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserActivityLogRepository>>();
-    return new UserActivityLogRepository(context.UserActivityLogs, logger);
-});
-
-builder.Services.AddScoped<IUserQuizAttemptRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserQuizAttemptRepository>>();
-    return new UserQuizAttemptRepository(context.UserQuizAttempts, logger);
-});
-
-builder.Services.AddScoped<IUserQuizAnswerRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserQuizAnswerRepository>>();
-    return new UserQuizAnswerRepository(context.UserQuizAnswers, logger);
-});
-
-builder.Services.AddScoped<IUserRepository>(sp =>
-{
-    var context = sp.GetRequiredService<CoursesDbContext>();
-    var logger = sp.GetRequiredService<ILogger<UserRepository>>();
-    return new UserRepository(context.Users, logger);
-});
-
-// Register Services
-builder.Services.AddScoped<ICourseService, CourseService>();
-builder.Services.AddScoped<CoursesMessageHandler>(sp =>
-{
-    return new CoursesMessageHandler(
-        sp.GetRequiredService<ICourseService>(),
-        sp.GetRequiredService<IDiscussionPostService>(),
-        sp.GetRequiredService<ILessonService>(),
-        sp.GetRequiredService<ILessonRepository>(),
-        sp.GetRequiredService<IStandardSlideRepository>(),
-        sp.GetRequiredService<IDiscussionRepository>(),
-        sp.GetRequiredService<IQuizRepository>(),
-        sp.GetRequiredService<IQuizQuestionRepository>(),
-        sp.GetRequiredService<IUserQuizAttemptRepository>(),
-        sp.GetRequiredService<IUserQuizAnswerRepository>(),
-        sp.GetRequiredService<IUserCourseRepository>(),
-        sp.GetRequiredService<IUserLessonProgressRepository>(),
-        sp.GetRequiredService<IUserSlideProgressRepository>(),
-        sp.GetRequiredService<IUserActivityLogRepository>(),
-        sp.GetRequiredService<ILogger<CoursesMessageHandler>>());
-});
-
-// Register RabbitMQ Service
-var rabbitMQConfig = builder.Configuration.GetSection("RabbitMQ");
-builder.Services.AddSingleton<IRabbitMQService>(sp =>
-{
-    var logger = sp.GetRequiredService<ILogger<RabbitMQService>>();
-    return new RabbitMQService(
-        rabbitMQConfig["HostName"] ?? "localhost",
-        int.Parse(rabbitMQConfig["Port"] ?? "5672"),
-        rabbitMQConfig["UserName"] ?? "guest",
-        rabbitMQConfig["Password"] ?? "guest",
-        logger);
-});
-
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+// CORS Configuration using Options pattern
+builder.Services.AddCorsPolicy(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+
+// Configure the HTTP request pipeline
+// Global exception handler must be first
+app.UseGlobalExceptionHandler();
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Courses Service API v1");
+    c.RoutePrefix = "swagger";
+});
+
+app.UseHttpsRedirection();
+app.UseCors("DefaultPolicy"); // Changed from "AllowAll" to "DefaultPolicy"
+
+// Enable static files for uploaded images
+var wwwrootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+if (!Directory.Exists(wwwrootPath))
+{
+    Directory.CreateDirectory(wwwrootPath);
+}
+
+app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath),
+    RequestPath = ""
+});
+
+app.MapControllers();
 
 // Ensure database indexes are created (with error handling)
 try
@@ -210,7 +91,7 @@ catch (MongoException ex)
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
     logger.LogError(ex, "Failed to create MongoDB indexes. The application will continue, but some features may not work correctly. " +
-                        "Please ensure MongoDB is running and accessible at: {ConnectionString}", mongoConnectionString);
+                        "Please ensure MongoDB is running and accessible.");
 }
 catch (Exception ex)
 {
@@ -218,37 +99,10 @@ catch (Exception ex)
     logger.LogError(ex, "An unexpected error occurred while creating MongoDB indexes. The application will continue.");
 }
 
-// Configure the HTTP request pipeline
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Courses Service API v1");
-    c.RoutePrefix = "swagger";
-});
-
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-
-// Enable static files for uploaded images
-var wwwrootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
-if (!Directory.Exists(wwwrootPath))
-{
-    Directory.CreateDirectory(wwwrootPath);
-}
-
-app.UseStaticFiles();
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath),
-    RequestPath = ""
-});
-
-app.MapControllers();
-
 // Start RabbitMQ listener (optional - app will still run if RabbitMQ is unavailable)
 try
 {
-    var rabbitMQService = app.Services.GetRequiredService<IRabbitMQService>();
+    var rabbitMQService = app.Services.GetRequiredService<Shared.Services.IRabbitMQService>();
     
     rabbitMQService.StartListening(RabbitMQConstants.CoursesServiceQueue, async (messageJson, routingKey) =>
     {
@@ -268,6 +122,24 @@ catch (Exception ex)
     logger.LogWarning(ex, "Failed to start RabbitMQ listener. The application will continue without RabbitMQ messaging. " +
                           "Please ensure RabbitMQ is running if you need messaging functionality.");
 }
+
+// Register RabbitMQService disposal on application shutdown
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    try
+    {
+        var rabbitMQService = app.Services.GetRequiredService<Shared.Services.IRabbitMQService>();
+        if (rabbitMQService is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error disposing RabbitMQ service during shutdown");
+    }
+});
 
 // Run the application
 app.Run();

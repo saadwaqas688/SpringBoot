@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Gateway.Services;
-using Shared.Common;
+using Gateway.Infrastructure.Services;
+using Shared.Core.Common;
 
 namespace Gateway.Controllers;
 
@@ -32,5 +32,7 @@ public class UsersController : ControllerBase
     }
 
 }
+
+
 
 

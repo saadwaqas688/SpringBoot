@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Gateway.DTOs;
-using Gateway.Services;
-using Shared.Common;
+using Gateway.Application.DTOs;
+using Gateway.Infrastructure.Services;
+using Shared.Core.Common;
 
 namespace Gateway.Controllers;
 
@@ -25,28 +25,18 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("signup")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignUp([FromBody] SignUpDto dto)
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignUp([FromBody] SignUpDto dto, CancellationToken cancellationToken = default)
     {
         var response = await _userAccountGatewayService.SignUpAsync(dto);
-        return StatusCode(response.Success ? 200 : 400, response);
+        return StatusCode(response.Success ? 201 : 400, response); // 201 Created for successful signup
     }
 
     [HttpPost("signin")]
-    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignIn([FromBody] SignInDto dto)
+    public async Task<ActionResult<ApiResponse<AuthResponseDto>>> SignIn([FromBody] SignInDto dto, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await _userAccountGatewayService.SignInAsync(dto);
-            return StatusCode(response.Success ? 200 : 401, response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error during signin");
-            return StatusCode(500, ApiResponse<AuthResponseDto>.ErrorResponse(
-                ex.Message.Contains("RabbitMQ") || ex.Message.Contains("BrokerUnreachable")
-                    ? "Service temporarily unavailable. RabbitMQ connection failed. Please check if RabbitMQ is running."
-                    : "An unexpected error occurred during signin"));
-        }
+        // Exception handling is now done by GlobalExceptionHandlerMiddleware
+        var response = await _userAccountGatewayService.SignInAsync(dto);
+        return StatusCode(response.Success ? 200 : 401, response);
     }
 
     [Authorize]
@@ -111,10 +101,10 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpPost("users")]
-    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto)
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto, CancellationToken cancellationToken = default)
     {
         var response = await _userAccountGatewayService.CreateUserAsync(dto);
-        return StatusCode(response.Success ? 200 : 400, response);
+        return StatusCode(response.Success ? 201 : 400, response); // 201 Created for successful creation
     }
 
     [Authorize]
@@ -127,15 +117,15 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpDelete("users/{id}")]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string id)
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(string id, CancellationToken cancellationToken = default)
     {
         var response = await _userAccountGatewayService.DeleteUserAsync(id);
-        return StatusCode(response.Success ? 200 : 400, response);
+        return StatusCode(response.Success ? 204 : 400, response); // 204 No Content for successful deletion
     }
 
     [Authorize]
     [HttpPut("users/{id}/status")]
-    public async Task<ActionResult<ApiResponse<bool>>> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto)
+    public async Task<ActionResult<ApiResponse<UserInfoDto>>> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto, CancellationToken cancellationToken = default)
     {
         var response = await _userAccountGatewayService.UpdateUserStatusAsync(id, dto.Status);
         return StatusCode(response.Success ? 200 : 400, response);
@@ -146,4 +136,6 @@ public class UpdateUserStatusDto
 {
     public string Status { get; set; } = string.Empty;
 }
+
+
 

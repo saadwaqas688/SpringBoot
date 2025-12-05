@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Services;
 using CoursesService.DTOs;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -75,5 +75,6 @@ public class DiscussionPostsController : ControllerBase
         return response.Success ? Ok(response) : StatusCode(500, response);
     }
 }
+
 
 

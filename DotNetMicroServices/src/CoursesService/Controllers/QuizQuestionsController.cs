@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using CoursesService.Models;
 using CoursesService.Repositories;
-using Shared.Common;
+using Shared.Core.Common;
 
 namespace CoursesService.Controllers;
 
@@ -109,5 +109,6 @@ public class QuizQuestionsController : ControllerBase
         }
     }
 }
+
 
 

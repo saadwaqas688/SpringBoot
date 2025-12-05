@@ -1,14 +1,12 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
-using System.Text;
-using UserAccountService.Data;
+using UserAccountService.Infrastructure.Data;
+using UserAccountService.Extensions;
 using UserAccountService.Models;
-using UserAccountService.Services;
-using Shared.Services;
+using UserAccountService.Application.Services;
+using UserAccountService.Infrastructure.Services;
 using Shared.Constants;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using Shared.Application.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +18,7 @@ builder.Services.AddControllers(options =>
     // - Validates DTOs using Data Annotations before controller actions execute
     // - Returns consistent ApiResponse format for validation errors
     // - Eliminates need for manual ModelState.IsValid checks in controllers
-    options.Filters.Add<Shared.Filters.ValidateModelAttribute>();
+    options.Filters.Add<Shared.Application.Filters.ValidateModelAttribute>();
 })
     .AddJsonOptions(options =>
     {
@@ -32,80 +30,43 @@ builder.Services.AddControllers(options =>
     {
         // Register TransformModelBinderProvider to enable [Transform] attribute
         // This allows field transformation similar to NestJS's @Transform decorator
-        options.ModelBinderProviders.Insert(0, new Shared.ModelBinders.TransformModelBinderProvider());
+        options.ModelBinderProviders.Insert(0, new Shared.Application.ModelBinders.TransformModelBinderProvider());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// MongoDB Configuration
-var mongoConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "mongodb://localhost:27017";
-var mongoDatabaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "UserAccountDB";
-
-builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
-builder.Services.AddScoped<MongoDbContext>(sp =>
-{
-    var mongoClient = sp.GetRequiredService<IMongoClient>();
-    return new MongoDbContext(mongoClient, mongoDatabaseName);
-});
+// MongoDB Configuration using Options pattern
+builder.Services.AddUserAccountMongoDb(builder.Configuration);
 
 // Register services
-builder.Services.AddScoped<IUserAccountService, UserAccountService.Services.UserAccountService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<UserAccountMessageHandler>();
+builder.Services.AddUserAccountServices();
 
-// JWT Authentication Configuration
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyThatShouldBeAtLeast32CharactersLong!";
-var issuer = jwtSettings["Issuer"] ?? "UserAccountService";
-var audience = jwtSettings["Audience"] ?? "UserAccountService";
+// JWT Authentication Configuration using Options pattern
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer,
-        ValidAudience = audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
-    };
-});
+// Register RabbitMQ Service using Options pattern
+builder.Services.AddRabbitMQService(builder.Configuration);
 
-builder.Services.AddAuthorization();
-
-// Register RabbitMQ Service
-var rabbitMQConfig = builder.Configuration.GetSection("RabbitMQ");
-builder.Services.AddSingleton<IRabbitMQService>(sp =>
-{
-    var logger = sp.GetRequiredService<ILogger<RabbitMQService>>();
-    return new RabbitMQService(
-        rabbitMQConfig["HostName"] ?? "localhost",
-        int.Parse(rabbitMQConfig["Port"] ?? "5672"),
-        rabbitMQConfig["UserName"] ?? "guest",
-        rabbitMQConfig["Password"] ?? "guest",
-        logger);
-});
-
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+// CORS Configuration using Options pattern
+builder.Services.AddCorsPolicy(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+
+// Configure the HTTP request pipeline
+// Global exception handler must be first
+app.UseGlobalExceptionHandler();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseCors("DefaultPolicy"); // Changed from "AllowAll" to "DefaultPolicy"
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 
 // Ensure database indexes are created and seed admin user (with error handling)
 try
@@ -152,8 +113,9 @@ try
 catch (MongoException ex)
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    var mongoDbSettings = app.Configuration.GetSection("MongoDb").Get<Shared.Application.Options.MongoDbSettings>();
     logger.LogError(ex, "Failed to initialize MongoDB (create indexes or seed admin user). The application will continue, but some features may not work correctly. " +
-                        "Please ensure MongoDB is running and accessible at: {ConnectionString}", mongoConnectionString);
+                        "Please ensure MongoDB is running and accessible.");
 }
 catch (Exception ex)
 {
@@ -161,23 +123,10 @@ catch (Exception ex)
     logger.LogError(ex, "An unexpected error occurred while initializing MongoDB. The application will continue.");
 }
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
 // Start RabbitMQ listener (optional - app will still run if RabbitMQ is unavailable)
 try
 {
-    var rabbitMQService = app.Services.GetRequiredService<IRabbitMQService>();
+    var rabbitMQService = app.Services.GetRequiredService<Shared.Infrastructure.Services.IRabbitMQService>();
     
     rabbitMQService.StartListening(RabbitMQConstants.UserAccountServiceQueue, async (messageJson, routingKey) =>
     {
@@ -197,6 +146,24 @@ catch (Exception ex)
     logger.LogWarning(ex, "Failed to start RabbitMQ listener. The application will continue without RabbitMQ messaging. " +
                           "Please ensure RabbitMQ is running if you need messaging functionality.");
 }
+
+// Register RabbitMQService disposal on application shutdown
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    try
+    {
+        var rabbitMQService = app.Services.GetRequiredService<Shared.Infrastructure.Services.IRabbitMQService>();
+        if (rabbitMQService is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error disposing RabbitMQ service during shutdown");
+    }
+});
 
 // Run the application
 app.Run();
