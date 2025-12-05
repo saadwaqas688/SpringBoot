@@ -13,12 +13,26 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+{
+    // Apply global validation filter - automatically validates all incoming requests
+    // This mimics NestJS's ValidationPipe behavior:
+    // - Validates DTOs using Data Annotations before controller actions execute
+    // - Returns consistent ApiResponse format for validation errors
+    // - Eliminates need for manual ModelState.IsValid checks in controllers
+    options.Filters.Add<Shared.Filters.ValidateModelAttribute>();
+})
     .AddJsonOptions(options =>
     {
         // Allow case-insensitive property matching (camelCase from frontend -> PascalCase in C#)
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    })
+    .AddMvcOptions(options =>
+    {
+        // Register TransformModelBinderProvider to enable [Transform] attribute
+        // This allows field transformation similar to NestJS's @Transform decorator
+        options.ModelBinderProviders.Insert(0, new Shared.ModelBinders.TransformModelBinderProvider());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

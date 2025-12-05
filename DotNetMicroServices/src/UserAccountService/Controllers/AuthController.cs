@@ -371,6 +371,8 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<UserInfoDto>>> CreateUser([FromBody] CreateUserDto dto)
     {
+        // Note: Model validation is now handled automatically by ValidateModelAttribute filter
+        // No need for manual ModelState.IsValid checks - validation happens before this method executes
         try
         {
             // Check if user already exists
@@ -431,6 +433,8 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<UserInfoDto>>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
     {
+        // Note: Model validation is now handled automatically by ValidateModelAttribute filter
+        // No need for manual ModelState.IsValid checks - validation happens before this method executes
         try
         {
             var updatedUser = await _userAccountService.UpdateUserAdminAsync(id, dto);
